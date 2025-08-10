@@ -22,7 +22,9 @@
 - **モック**: Google Apps Script API
 
 ### 1.4 品質指標
-- **テスト成功率**: 100% (152/152 テスト通過)
+- **テスト成功率**: 100% (178/178 テスト通過)
+- **単体テスト**: 100% (152/152 テスト通過)
+- **統合テスト**: 100% (26/26 テスト通過)
 - **コードカバレッジ**: 主要機能90%以上
 - **型安全性**: TypeScript厳格モード
 - **静的解析**: ESLint警告ゼロ
@@ -63,6 +65,28 @@
 **役割**: Google Apps Scriptトリガー管理・メイン制御フロー  
 **テストファイル**: `test/unit/TriggerManager.test.ts`  
 **テスト数**: 17項目
+
+### 2.8 統合テスト ✅ **実装完了**
+
+#### 2.8.1 基本統合テスト
+**役割**: 全モジュール間の連携確認・基本フロー検証  
+**テストファイル**: `test/integration/basic-integration.test.ts`  
+**テスト数**: 9項目
+
+#### 2.8.2 スプレッドシート基本統合テスト
+**役割**: ConfigManagerとスプレッドシート連携・エラーハンドリング  
+**テストファイル**: `test/integration/spreadsheet-basic.test.ts`  
+**テスト数**: 6項目
+
+#### 2.8.3 Notion API基本統合テスト
+**役割**: NotionApiClientとDataMapper連携・API通信確認  
+**テストファイル**: `test/integration/notion-api-basic.test.ts`  
+**テスト数**: 5項目
+
+#### 2.8.4 エンドツーエンド基本統合テスト
+**役割**: システム全体のワークフロー確認・TriggerManager統合  
+**テストファイル**: `test/integration/end-to-end-basic.test.ts`  
+**テスト数**: 6項目
 
 ### 2.5 DataMapper.ts
 **役割**: スプレッドシートデータからNotionページへの変換  
@@ -1155,7 +1179,167 @@ Object.assign(console, mockConsole);
 - 最大値、最小値、空文字、特殊文字等
 - データバリデーション機能をテスト
 
-## 11. テスト実行・管理
+## 11. 統合テスト仕様 ✅ **実装完了**
+
+### 11.1 基本統合テスト
+
+#### 11.1.1 システム初期化テスト
+```typescript
+describe('System Integration', () => {
+  test('should initialize all modules correctly');
+  test('should clear logger history');
+  test('should handle module dependencies');
+});
+```
+**テスト内容:**
+- 全モジュールの正常な初期化確認
+- モジュール間依存関係の検証
+- ログシステムの初期化確認
+
+**期待結果:**
+- 全モジュールが正常に連携して動作
+
+#### 11.1.2 設定管理統合テスト
+```typescript
+describe('Configuration Integration', () => {
+  test('should load configuration through all modules');
+  test('should handle configuration errors across modules');
+});
+```
+**テスト内容:**
+- ConfigManagerを経由した設定情報の全モジュール共有
+- 設定エラー時の各モジュールでの適切な処理
+
+**期待結果:**
+- 一貫した設定情報の共有と統一されたエラーハンドリング
+
+### 11.2 スプレッドシート基本統合テスト
+
+#### 11.2.1 設定読み込み統合
+```typescript
+describe('Spreadsheet Integration', () => {
+  test('should load configuration from spreadsheet');
+  test('should load column mappings from spreadsheet');
+  test('should handle different data types correctly');
+});
+```
+**テスト内容:**
+- スプレッドシートからの設定情報読み込み
+- カラムマッピング情報の取得と検証
+- 各種データ型の適切な処理
+
+**期待結果:**
+- スプレッドシート設定の正確な読み込みと利用
+
+#### 11.2.2 エラーハンドリング統合
+```typescript
+describe('Error Handling Integration', () => {
+  test('should handle missing configuration sheet');
+  test('should handle missing mapping sheet');
+});
+```
+**テスト内容:**
+- 設定シート不在時の適切なエラー処理
+- マッピングシート不在時のエラーハンドリング
+- ConfigManagerとLoggerの連携確認
+
+**期待結果:**
+- 統一されたエラーメッセージとログ記録
+
+### 11.3 Notion API基本統合テスト
+
+#### 11.3.1 API通信統合
+```typescript
+describe('Notion API Integration', () => {
+  test('should establish connection with proper configuration');
+  test('should handle API responses correctly');
+  test('should integrate with DataMapper for data transformation');
+});
+```
+**テスト内容:**
+- ConfigManagerからの認証情報取得
+- NotionApiClientでのAPI通信実行
+- DataMapperとの連携によるデータ変換
+
+**期待結果:**
+- 設定から通信まで一貫したAPI連携フロー
+
+#### 11.3.2 データ変換統合
+```typescript
+describe('Data Transformation Integration', () => {
+  test('should validate and transform data end-to-end');
+  test('should handle transformation errors appropriately');
+});
+```
+**テスト内容:**
+- Validator → DataMapper → NotionApiClientの連携
+- 各段階でのエラーハンドリング確認
+
+**期待結果:**
+- データ品質を保った状態での変換・送信
+
+### 11.4 エンドツーエンド基本統合テスト
+
+#### 11.4.1 トリガー処理統合
+```typescript
+describe('End-to-End Integration', () => {
+  test('should handle edit triggers correctly');
+  test('should process import workflow completely');
+  test('should maintain error history across operations');
+});
+```
+**テスト内容:**
+- Google Apps Scriptトリガーからの処理開始
+- 全モジュールを経由した完全なワークフロー実行
+- エラー発生時の適切な処理継続
+
+**期待結果:**
+- システム全体の協調動作による期待される結果の実現
+
+### 11.5 統合テスト結果
+
+#### 11.5.1 実行結果サマリー
+```
+Integration Test Suites: 4 passed, 4 total
+Integration Tests:       26 passed, 26 total
+Success Rate:           100%
+```
+
+#### 11.5.2 統合テスト詳細結果
+
+**basic-integration.test.ts**
+- **テスト数**: 9項目
+- **成功率**: 100%
+- **主要検証項目**: モジュール間連携、ログ機能、設定管理
+
+**spreadsheet-basic.test.ts**
+- **テスト数**: 6項目  
+- **成功率**: 100%
+- **主要検証項目**: スプレッドシート読み込み、エラーハンドリング
+
+**notion-api-basic.test.ts**
+- **テスト数**: 5項目
+- **成功率**: 100%
+- **主要検証項目**: API通信、データ変換、エラー処理
+
+**end-to-end-basic.test.ts**
+- **テスト数**: 6項目
+- **成功率**: 100%
+- **主要検証項目**: 全体ワークフロー、トリガー処理
+
+### 11.6 統合テストの特徴
+
+#### 11.6.1 シンプル化アプローチ
+- 複雑な統合テストを削除し、保守性の高い基本的なテストに集約
+- エラーハンドリングテストでは意図的なエラー発生による検証実施
+- Google Apps Script APIの適切なモック化
+
+#### 11.6.2 品質保証方針
+- 実際の運用で発生する可能性の高いシナリオに焦点
+- エラーメッセージの一貫性と分かりやすさの確認
+- モジュール間のデータフロー完全性の検証
+
+## 12. テスト実行・管理
 
 ### 11.1 テスト実行コマンド
 
