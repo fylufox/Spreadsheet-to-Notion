@@ -79,16 +79,32 @@ export class TriggerManager {
       }
 
       // チェックボックス列の編集かチェック
+      Logger.debug('Checking if edit is in checkbox column', {
+        editColumn: e.range.getColumn(),
+        checkboxColumn: CONSTANTS.COLUMNS.CHECKBOX,
+        isCheckboxColumn: this.isCheckboxColumn(e.range),
+      });
+
       if (!this.isCheckboxColumn(e.range)) {
         Logger.debug('Edit is not in checkbox column, skipping');
         return;
       }
 
       // チェックONの場合のみ処理（true, 'TRUE', 1, '1'を許可）
+      Logger.debug('Checking checkbox value', {
+        value: e.value,
+        type: typeof e.value,
+        isChecked: this.isCheckboxChecked(e.value),
+      });
+
       if (!this.isCheckboxChecked(e.value)) {
         Logger.debug('Checkbox is not checked, skipping');
         return;
       }
+
+      Logger.info('Checkbox validation passed, proceeding with import', {
+        rowNumber: e.range.getRow(),
+      });
 
       // セキュリティチェック
       this.validateAccess(e);
@@ -123,12 +139,32 @@ export class TriggerManager {
       Logger.info('Starting import process', { rowNumber });
 
       // 設定取得
+      Logger.debug('Loading configuration...');
       const config = await ConfigManager.getConfig();
+      Logger.debug('Configuration loaded successfully', {
+        databaseId: config.databaseId
+          ? config.databaseId.substring(0, 8) + '...'
+          : 'Not set',
+        projectName: config.projectName,
+      });
+
+      Logger.debug('Loading column mappings...');
       const mappings = ConfigManager.getColumnMappings();
+      Logger.debug('Column mappings loaded', {
+        totalMappings: mappings.length,
+        targetMappings: mappings.filter(m => m.isTarget).length,
+      });
 
       // データ取得
+      Logger.debug('Retrieving row data...', { rowNumber });
       const rowData = this.getRowData(rowNumber);
-      Logger.debug('Row data retrieved', { rowData });
+      Logger.debug('Row data retrieved', {
+        rowData:
+          rowData
+            .map((value, index) => `[${index}]${value}`)
+            .join(', ')
+            .substring(0, 200) + '...',
+      });
 
       // データ検証
       const validationResult = Validator.validateRowData(rowData, mappings);

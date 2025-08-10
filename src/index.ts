@@ -17,6 +17,8 @@
 // エントリーポイント - Google Apps Script用
 import { Logger } from './utils/Logger';
 import { CONSTANTS } from './utils/Constants';
+import { TriggerManager } from './core/TriggerManager';
+import { ConfigManager } from './core/ConfigManager';
 
 /**
  * スプレッドシート編集時のトリガー関数
@@ -30,12 +32,13 @@ function onEdit(e: GoogleAppsScript.Events.SheetsOnEdit): void {
       user: e.user?.getEmail(),
     });
 
-    // TODO: TriggerManager実装後に置き換え
-    // TriggerManager.onEdit(e);
+    // TriggerManagerを使用して同期処理を実行
+    const triggerManager = TriggerManager.getInstance();
+    triggerManager.onEdit(e).catch(error => {
+      Logger.error('Async onEdit failed', error);
+    });
   } catch (error) {
     Logger.error('onEdit failed', error);
-    // TODO: ErrorManager実装後に置き換え
-    // ErrorManager.handleError(error, 'onEdit');
   }
 }
 
@@ -89,7 +92,212 @@ function testBasicFunctions(): void {
   }
 }
 
-// Google Apps Script用の関数をグローバルスコープに公開
-(global as any).onEdit = onEdit;
-(global as any).initializeSystem = initializeSystem;
-(global as any).testBasicFunctions = testBasicFunctions;
+/**
+ * TriggerManagerの動作をテストする関数（デバッグ用）
+ */
+function testTriggerManager(): void {
+  try {
+    Logger.info('Testing TriggerManager functionality');
+
+    const triggerManager = TriggerManager.getInstance();
+
+    // 処理ステータスを確認
+    const status = triggerManager.getProcessingStatus();
+    Logger.info('Current processing status', status);
+
+    // システム統計を確認
+    const stats = triggerManager.getSystemStats();
+    Logger.info('System statistics', stats);
+
+    // ヘルスチェックを実行
+    const health = triggerManager.healthCheck();
+    Logger.info('Health check results', health);
+
+    Logger.info('TriggerManager test completed');
+  } catch (error) {
+    Logger.error('TriggerManager test failed', error);
+  }
+}
+
+/**
+ * 設定情報をテストする関数（デバッグ用）
+ */
+function testConfiguration(): void {
+  try {
+    Logger.info('Testing configuration');
+
+    // 設定のヘルスチェック
+    ConfigManager.healthCheck()
+      .then((result: { healthy: boolean; issues: string[] }) => {
+        Logger.info('Configuration health check result', result);
+
+        if (result.healthy) {
+          // 設定取得テスト
+          ConfigManager.getConfig()
+            .then((config: any) => {
+              Logger.info('Configuration loaded successfully', {
+                projectName: config.projectName,
+                version: config.version,
+                hasValidToken: !!config.apiToken,
+                databaseId: config.databaseId
+                  ? config.databaseId.substring(0, 8) + '...'
+                  : 'Not set',
+              });
+            })
+            .catch((error: any) => {
+              Logger.error('Failed to load configuration', error);
+            });
+
+          // カラムマッピングテスト
+          try {
+            const mappings = ConfigManager.getColumnMappings();
+            Logger.info('Column mappings loaded', {
+              totalMappings: mappings.length,
+              targetMappings: mappings.filter((m: any) => m.isTarget).length,
+            });
+          } catch (error) {
+            Logger.error('Failed to load column mappings', error);
+          }
+        } else {
+          Logger.error('Configuration health check failed', result.issues);
+        }
+      })
+      .catch((error: any) => {
+        Logger.error('Configuration health check failed', error);
+      });
+  } catch (error) {
+    Logger.error('Configuration test failed', error);
+  }
+}
+
+/**
+ * 手動でonEdit処理をテストする関数
+ */
+function testOnEditManually(rowNumber?: number): void {
+  try {
+    Logger.info('Manual onEdit test started', { rowNumber });
+
+    const testRowNumber = rowNumber || 2; // デフォルトは2行目
+
+    // テスト用のEditEventオブジェクトを作成
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    const range = sheet.getRange(testRowNumber, CONSTANTS.COLUMNS.CHECKBOX);
+
+    const mockEditEvent = {
+      range: range,
+      value: true, // チェックボックスON
+      oldValue: false,
+      source: SpreadsheetApp.getActiveSpreadsheet(),
+      user: Session.getActiveUser(),
+    };
+
+    Logger.info('Created mock edit event', {
+      range: range.getA1Notation(),
+      value: mockEditEvent.value,
+    });
+
+    // TriggerManagerで処理
+    const triggerManager = TriggerManager.getInstance();
+    triggerManager
+      .onEdit(mockEditEvent)
+      .then(() => {
+        Logger.info('Manual onEdit test completed successfully');
+      })
+      .catch(error => {
+        Logger.error('Manual onEdit test failed', error);
+      });
+  } catch (error) {
+    Logger.error('Manual onEdit test setup failed', error);
+  }
+}
+
+/**
+ * 詳細な診断を実行する関数
+ */
+function runDiagnostics(): void {
+  try {
+    Logger.info('=== スプレッドシート to Notion 診断開始 ===');
+
+    // 1. スプレッドシート構造の確認
+    Logger.info('1. スプレッドシート構造の確認');
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const sheets = spreadsheet.getSheets();
+
+    Logger.info('利用可能なシート:', {
+      sheetNames: sheets.map(sheet => sheet.getName()),
+      totalSheets: sheets.length,
+    });
+
+    // 必要なシートの確認
+    const requiredSheets = [
+      CONSTANTS.SHEETS.IMPORT_DATA,
+      CONSTANTS.SHEETS.IMPORT_COLUMN,
+      CONSTANTS.SHEETS.CONFIG,
+    ];
+    const missingSheets: string[] = [];
+
+    requiredSheets.forEach(sheetName => {
+      const sheet = spreadsheet.getSheetByName(sheetName);
+      if (!sheet) {
+        missingSheets.push(sheetName);
+      } else {
+        Logger.info(`シート "${sheetName}" が見つかりました`, {
+          lastRow: sheet.getLastRow(),
+          lastColumn: sheet.getLastColumn(),
+        });
+      }
+    });
+
+    if (missingSheets.length > 0) {
+      Logger.error('必要なシートが見つかりません:', missingSheets);
+      return;
+    }
+
+    // 2. 設定の確認
+    Logger.info('2. 設定の確認');
+    testConfiguration();
+
+    // 3. チェックボックス列の確認
+    Logger.info('3. チェックボックス列の確認');
+    const importDataSheet = spreadsheet.getSheetByName(
+      CONSTANTS.SHEETS.IMPORT_DATA
+    );
+    if (importDataSheet) {
+      const checkboxColumn = CONSTANTS.COLUMNS.CHECKBOX;
+      const lastRow = importDataSheet.getLastRow();
+
+      if (lastRow > 1) {
+        // 2行目のチェックボックス値を確認
+        const checkboxValue = importDataSheet
+          .getRange(2, checkboxColumn)
+          .getValue();
+        Logger.info('2行目のチェックボックス値:', {
+          value: checkboxValue,
+          type: typeof checkboxValue,
+          column: checkboxColumn,
+        });
+      }
+    }
+
+    // 4. TriggerManagerのテスト
+    Logger.info('4. TriggerManagerのテスト');
+    testTriggerManager();
+
+    Logger.info('=== 診断完了 ===');
+  } catch (error) {
+    Logger.error('診断中にエラーが発生しました:', error);
+  }
+}
+
+/**
+ * グローバル関数の定義（Google Apps Script用）
+ * スプレッドシートから直接実行可能な関数
+ */
+
+// デバッグ用グローバル関数を定義
+(globalThis as any).runDiagnostics = runDiagnostics;
+(globalThis as any).testConfiguration = testConfiguration;
+(globalThis as any).testTriggerManager = testTriggerManager;
+(globalThis as any).testOnEditManually = testOnEditManually;
+(globalThis as any).initializeSystem = initializeSystem;
+(globalThis as any).testBasicFunctions = testBasicFunctions;
