@@ -178,7 +178,7 @@ export class MappingError extends Error {
     this.code = 'MAPPING_ERROR';
     this.cause = cause;
     this.context = context || {};
-    
+
     // Error.captureStackTrace が利用可能な場合はスタックトレースをキャプチャ
     if (Error.captureStackTrace) {
       Error.captureStackTrace(this, MappingError);
@@ -186,8 +186,77 @@ export class MappingError extends Error {
   }
 }
 export class ApiError extends SpreadsheetToNotionError {
-  constructor(message: string, originalError?: Error) {
+  public statusCode: number;
+  public responseBody: string;
+
+  constructor(
+    message: string,
+    statusCode = 0,
+    responseBody = '',
+    originalError?: Error
+  ) {
     super(message, ErrorType.API_ERROR, originalError);
     this.name = 'ApiError';
+    this.statusCode = statusCode;
+    this.responseBody = responseBody;
   }
+}
+
+/**
+ * Notion API関連の型定義
+ */
+
+/**
+ * データベース情報
+ */
+export interface DatabaseInfo {
+  id: string;
+  title: string;
+  properties: Array<{
+    name: string;
+    type: string;
+    id: string;
+    config: PropertyConfig;
+  }>;
+}
+
+/**
+ * プロパティ設定情報
+ */
+export interface PropertyConfig {
+  type: string;
+  required: boolean;
+  options?: Array<{ name: string; color: string }>;
+  format?: string;
+  expression?: string;
+}
+
+/**
+ * 接続テスト結果
+ */
+export interface ConnectionTestResult {
+  success: boolean;
+  databaseTitle?: string;
+  propertyCount?: number;
+  error?: string;
+  message: string;
+}
+
+/**
+ * クエリ結果
+ */
+export interface QueryResult {
+  results: NotionPageResponse[];
+  hasMore: boolean;
+  nextCursor?: string;
+}
+
+/**
+ * リクエストオプション
+ */
+export interface RequestOptions {
+  method?: GoogleAppsScript.URL_Fetch.HttpMethod;
+  headers?: Record<string, string>;
+  payload?: string;
+  muteHttpExceptions?: boolean;
 }
