@@ -101,11 +101,28 @@ export class ConfigManager {
       );
 
       if (!token) {
+        // プロパティの詳細情報をログ出力
+        const allProperties =
+          PropertiesService.getScriptProperties().getProperties();
+        Logger.error('API token not found in properties', {
+          availableKeys: Object.keys(allProperties),
+          searchingForKey: CONSTANTS.CONFIG_KEYS.NOTION_API_TOKEN,
+          propertiesCount: Object.keys(allProperties).length,
+        });
         throw new ConfigError('Notion API token not configured');
       }
 
       if (!CONSTANTS.PATTERNS.API_TOKEN.test(token)) {
-        throw new ConfigError('Invalid API token format');
+        Logger.error('Invalid API token format', {
+          tokenLength: token.length,
+          startsWithSecret: token.startsWith('secret_'),
+          startsWithNtn: token.startsWith('ntn_'),
+          actualPattern: token.substring(0, 10) + '...',
+          expectedFormats: 'secret_xxx... or ntn_xxx...',
+        });
+        throw new ConfigError(
+          'Invalid API token format. Expected format: secret_xxx... or ntn_xxx...'
+        );
       }
 
       Logger.debug('API token retrieved successfully');
@@ -182,7 +199,16 @@ export class ConfigManager {
   public static setApiToken(token: string): boolean {
     try {
       if (!token || !CONSTANTS.PATTERNS.API_TOKEN.test(token)) {
-        throw new ConfigError('Invalid API token format');
+        Logger.error('Invalid API token format provided', {
+          hasToken: !!token,
+          tokenLength: token?.length || 0,
+          startsWithSecret: token?.startsWith('secret_') || false,
+          startsWithNtn: token?.startsWith('ntn_') || false,
+          expectedFormats: 'secret_xxx... or ntn_xxx...',
+        });
+        throw new ConfigError(
+          'Invalid API token format. Expected format: secret_xxx... or ntn_xxx...'
+        );
       }
 
       PropertiesService.getScriptProperties().setProperty(
@@ -199,6 +225,23 @@ export class ConfigManager {
     } catch (error) {
       Logger.error('Failed to set API token', error);
       return false;
+    }
+  }
+
+  /**
+   * デバッグ用：プロパティサービスの内容を確認
+   */
+  public static debugProperties(): void {
+    try {
+      const properties =
+        PropertiesService.getScriptProperties().getProperties();
+      Logger.info('Current GAS Properties', {
+        keys: Object.keys(properties),
+        hasNotionToken: CONSTANTS.CONFIG_KEYS.NOTION_API_TOKEN in properties,
+        totalCount: Object.keys(properties).length,
+      });
+    } catch (error) {
+      Logger.error('Failed to read properties', error);
     }
   }
 
@@ -314,7 +357,9 @@ export class ConfigManager {
       config.apiToken &&
       !CONSTANTS.PATTERNS.API_TOKEN.test(config.apiToken)
     ) {
-      errors.push('Invalid API token format');
+      errors.push(
+        'Invalid API token format (expected: secret_xxx... or ntn_xxx...)'
+      );
     }
 
     if (errors.length > 0) {

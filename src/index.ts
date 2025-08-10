@@ -290,6 +290,78 @@ function runDiagnostics(): void {
 }
 
 /**
+ * Notion APIトークンを設定する関数（手動実行用）
+ * @param token Notion APIトークン（secret_またはntn_で始まる文字列）
+ */
+function setNotionApiToken(token?: string): void {
+  try {
+    if (!token) {
+      Logger.error('APIトークンが指定されていません');
+      Logger.info(
+        '使用方法: setNotionApiToken("ntn_your_token_here") または setNotionApiToken("secret_your_token_here")'
+      );
+      return;
+    }
+
+    const success = ConfigManager.setApiToken(token);
+    if (success) {
+      Logger.info('Notion APIトークンが正常に設定されました');
+
+      // 設定後の確認
+      try {
+        const retrievedToken = ConfigManager.getApiToken();
+        Logger.info('設定確認完了', {
+          tokenSet: true,
+          tokenLength: retrievedToken.length,
+          startsCorrectly: retrievedToken.startsWith('secret_'),
+        });
+      } catch (error) {
+        Logger.error('設定後の確認に失敗しました', error);
+      }
+    } else {
+      Logger.error('Notion APIトークンの設定に失敗しました');
+    }
+  } catch (error) {
+    Logger.error('setNotionApiToken実行中にエラーが発生しました', error);
+  }
+}
+
+/**
+ * プロパティサービスの詳細な診断を行う関数
+ */
+function diagnoseProperties(): void {
+  try {
+    Logger.info('=== GASプロパティ診断開始 ===');
+
+    // ConfigManagerのデバッグ機能を使用
+    ConfigManager.debugProperties();
+
+    // 手動でプロパティ確認
+    const properties = PropertiesService.getScriptProperties().getProperties();
+    Logger.info('全プロパティの詳細:', {
+      totalCount: Object.keys(properties).length,
+      keys: Object.keys(properties),
+      hasNotionToken: CONSTANTS.CONFIG_KEYS.NOTION_API_TOKEN in properties,
+    });
+
+    // トークン取得テスト
+    try {
+      const token = ConfigManager.getApiToken();
+      Logger.info('APIトークン取得成功', {
+        tokenLength: token.length,
+        format: token.substring(0, 7) + '...',
+      });
+    } catch (error) {
+      Logger.error('APIトークン取得失敗', error);
+    }
+
+    Logger.info('=== プロパティ診断完了 ===');
+  } catch (error) {
+    Logger.error('プロパティ診断中にエラーが発生しました', error);
+  }
+}
+
+/**
  * グローバル関数の定義（Google Apps Script用）
  * スプレッドシートから直接実行可能な関数
  */
@@ -301,3 +373,5 @@ function runDiagnostics(): void {
 (globalThis as any).testOnEditManually = testOnEditManually;
 (globalThis as any).initializeSystem = initializeSystem;
 (globalThis as any).testBasicFunctions = testBasicFunctions;
+(globalThis as any).setNotionApiToken = setNotionApiToken;
+(globalThis as any).diagnoseProperties = diagnoseProperties;

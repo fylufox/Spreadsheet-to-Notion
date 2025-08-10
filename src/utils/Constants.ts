@@ -117,7 +117,8 @@ export const CONSTANTS = {
       /^[a-f0-9]{8}-?[a-f0-9]{4}-?[a-f0-9]{4}-?[a-f0-9]{4}-?[a-f0-9]{12}$/i,
     PAGE_ID:
       /^[a-f0-9]{8}-?[a-f0-9]{4}-?[a-f0-9]{4}-?[a-f0-9]{4}-?[a-f0-9]{12}$/i,
-    API_TOKEN: /^secret_[a-zA-Z0-9]{43}$/,
+    // Notion APIトークンの形式: 新形式(ntn_)と旧形式(secret_)の両方に対応
+    API_TOKEN: /^(secret_[a-zA-Z0-9]{43}|ntn_[a-zA-Z0-9]+)$/,
     EMAIL: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
     URL: /^https?:\/\/.+/,
     PHONE: /^[+]?[\d\s\-()]+$/,
