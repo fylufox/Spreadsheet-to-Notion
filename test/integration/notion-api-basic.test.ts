@@ -1,9 +1,24 @@
 /**
+ * Copyright 2025 Nakatani Naoya
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+/**
  * Notion API Basic Integration Tests
- * 
+ *
  * 基本的なNotion API統合テストのみを実行します。
  * 複雑なシナリオは除外し、コンパイルエラーを回避します。
- * 
+ *
  * @license Apache-2.0
  */
 
@@ -14,16 +29,16 @@ import sampleMappings from '../fixtures/sample-mappings.json';
 
 // UrlFetchApp のモック
 const mockUrlFetchApp = {
-  fetch: jest.fn()
+  fetch: jest.fn(),
 };
 
 const mockPropertiesService = {
-  getScriptProperties: jest.fn()
+  getScriptProperties: jest.fn(),
 };
 
 // SpreadsheetApp のモック（ConfigManagerが使用）
 const mockSpreadsheetApp = {
-  getActiveSpreadsheet: jest.fn()
+  getActiveSpreadsheet: jest.fn(),
 };
 
 // グローバルAPIをモック
@@ -44,7 +59,7 @@ describe('Notion API Basic Integration Tests', () => {
           return sampleConfig.apiToken;
         }
         return null;
-      })
+      }),
     };
 
     mockPropertiesService.getScriptProperties.mockReturnValue(mockProperties);
@@ -58,13 +73,13 @@ describe('Notion API Basic Integration Tests', () => {
               getValues: jest.fn().mockReturnValue([
                 ['DATABASE_ID', sampleConfig.notionDatabaseId],
                 ['PROJECT_NAME', 'Test Project'],
-                ['VERSION', '1.0.0']
-              ])
-            })
+                ['VERSION', '1.0.0'],
+              ]),
+            }),
           };
         }
         return null;
-      })
+      }),
     };
 
     mockSpreadsheetApp.getActiveSpreadsheet.mockReturnValue(mockSpreadsheet);
@@ -77,17 +92,18 @@ describe('Notion API Basic Integration Tests', () => {
       // Google Apps Script形式のHTTPResponseオブジェクトをモック
       const mockResponse = {
         getResponseCode: () => 200,
-        getContentText: () => JSON.stringify({
-          object: 'database',
-          id: sampleConfig.notionDatabaseId,
-          title: [{ plain_text: 'Test Database' }],
-          properties: {
-            'Title': { type: 'title' },
-            'Description': { type: 'rich_text' }
-          }
-        }),
+        getContentText: () =>
+          JSON.stringify({
+            object: 'database',
+            id: sampleConfig.notionDatabaseId,
+            title: [{ plain_text: 'Test Database' }],
+            properties: {
+              Title: { type: 'title' },
+              Description: { type: 'rich_text' },
+            },
+          }),
         getHeaders: () => ({}),
-        getBlob: () => null
+        getBlob: () => null,
       };
 
       mockUrlFetchApp.fetch.mockReturnValue(mockResponse);
@@ -126,7 +142,7 @@ describe('Notion API Basic Integration Tests', () => {
         'テスト担当者', // assignee
         'タグ1,タグ2', // tags
         'https://example.com', // url
-        'test@example.com' // email
+        'test@example.com', // email
       ];
 
       // sampleMappingsをColumnMapping形式に変換（列インデックスを数値で指定）
@@ -135,7 +151,7 @@ describe('Notion API Basic Integration Tests', () => {
         notionPropertyName: mapping.notion_property,
         dataType: mapping.notion_type,
         isTarget: true,
-        isRequired: mapping.notion_property === 'Title'
+        isRequired: mapping.notion_property === 'Title',
       }));
 
       const result = DataMapper.mapRowToNotionPage(
@@ -147,7 +163,9 @@ describe('Notion API Basic Integration Tests', () => {
       expect(result).toBeDefined();
       expect(result.properties).toBeDefined();
       expect(result.properties.Title).toBeDefined();
-      expect(result.properties.Title.title[0].text.content).toBe('テストタイトル');
+      expect(result.properties.Title.title[0].text.content).toBe(
+        'テストタイトル'
+      );
     });
 
     it('should handle invalid row data', () => {
@@ -159,7 +177,7 @@ describe('Notion API Basic Integration Tests', () => {
         notionPropertyName: mapping.notion_property,
         dataType: mapping.notion_type,
         isTarget: true,
-        isRequired: mapping.notion_property === 'Title'
+        isRequired: mapping.notion_property === 'Title',
       }));
 
       expect(() => {
@@ -172,22 +190,25 @@ describe('Notion API Basic Integration Tests', () => {
     it('should retrieve database information', async () => {
       const mockDatabaseResponse = {
         getResponseCode: () => 200,
-        getContentText: () => JSON.stringify({
-          object: 'database',
-          id: sampleConfig.notionDatabaseId,
-          title: [{ text: { content: 'Test Database' } }],
-          properties: {
-            Title: { id: 'title', type: 'title' },
-            Description: { id: 'desc', type: 'rich_text' }
-          }
-        }),
+        getContentText: () =>
+          JSON.stringify({
+            object: 'database',
+            id: sampleConfig.notionDatabaseId,
+            title: [{ text: { content: 'Test Database' } }],
+            properties: {
+              Title: { id: 'title', type: 'title' },
+              Description: { id: 'desc', type: 'rich_text' },
+            },
+          }),
         getHeaders: () => ({}),
-        getBlob: () => null
+        getBlob: () => null,
       };
 
       mockUrlFetchApp.fetch.mockReturnValue(mockDatabaseResponse);
 
-      const result = await notionApiClient.getDatabaseInfo(sampleConfig.notionDatabaseId);
+      const result = await notionApiClient.getDatabaseInfo(
+        sampleConfig.notionDatabaseId
+      );
 
       expect(result).toBeDefined();
       expect(result.id).toBe(sampleConfig.notionDatabaseId);

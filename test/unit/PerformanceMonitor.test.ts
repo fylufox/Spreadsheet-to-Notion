@@ -5,6 +5,21 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+/**
+ * Copyright 2025 Nakatani Naoya
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
@@ -23,11 +38,11 @@ jest.mock('../../src/utils/Logger');
 // Google Apps Script APIのモック
 const mockProperties = {
   getProperty: jest.fn(),
-  setProperty: jest.fn()
+  setProperty: jest.fn(),
 };
 
 const mockPropertiesService = {
-  getScriptProperties: jest.fn(() => mockProperties)
+  getScriptProperties: jest.fn(() => mockProperties),
 };
 
 // PropertiesServiceをグローバルオブジェクトに設定
@@ -39,24 +54,26 @@ describe('PerformanceMonitor', () => {
   beforeEach(() => {
     performanceMonitor = new PerformanceMonitor();
     jest.clearAllMocks();
-    
+
     // デフォルトの統計データをセット
-    mockProperties.getProperty.mockReturnValue(JSON.stringify({
-      totalProcessed: 100,
-      totalSuccess: 95,
-      totalErrors: 5,
-      overallSuccessRate: 95,
-      averageProcessingTime: 3000,
-      lastProcessedAt: new Date().toISOString(),
-      errorTrends: { 'VALIDATION_ERROR': 3, 'API_ERROR': 2 }
-    }));
+    mockProperties.getProperty.mockReturnValue(
+      JSON.stringify({
+        totalProcessed: 100,
+        totalSuccess: 95,
+        totalErrors: 5,
+        overallSuccessRate: 95,
+        averageProcessingTime: 3000,
+        lastProcessedAt: new Date().toISOString(),
+        errorTrends: { VALIDATION_ERROR: 3, API_ERROR: 2 },
+      })
+    );
   });
 
   describe('基本的なパフォーマンス測定', () => {
     test('測定開始と終了が正常に動作する', () => {
       // 測定開始
       performanceMonitor.startMeasurement(10);
-      
+
       // Logger.infoが呼ばれることを確認
       expect(Logger.info).toHaveBeenCalledWith(
         'パフォーマンス測定開始: 予定処理行数 10行',
@@ -101,14 +118,14 @@ describe('PerformanceMonitor', () => {
 
     test('測定中の現在状況取得', async () => {
       performanceMonitor.startMeasurement(5);
-      
+
       // 時間経過を確保するために少し待機
       await new Promise(resolve => setTimeout(resolve, 10));
-      
+
       performanceMonitor.recordSuccess();
-      
+
       const status = performanceMonitor.getCurrentStatus();
-      
+
       expect(status.processedRows).toBe(1);
       expect(status.successCount).toBe(1);
       expect(status.totalTime).toBeGreaterThan(0);
@@ -125,12 +142,12 @@ describe('PerformanceMonitor', () => {
       expect(stats.totalErrors).toBe(5);
       expect(stats.overallSuccessRate).toBe(95);
       expect(stats.averageProcessingTime).toBe(3000);
-      expect(stats.errorTrends).toEqual({ 'VALIDATION_ERROR': 3, 'API_ERROR': 2 });
+      expect(stats.errorTrends).toEqual({ VALIDATION_ERROR: 3, API_ERROR: 2 });
     });
 
     test('統計情報がない場合のデフォルト値', () => {
       mockProperties.getProperty.mockReturnValue(null);
-      
+
       const stats = performanceMonitor.getSystemStats();
 
       expect(stats.totalProcessed).toBe(0);
@@ -143,7 +160,7 @@ describe('PerformanceMonitor', () => {
 
     test('不正な統計データの場合のフォールバック', () => {
       mockProperties.getProperty.mockReturnValue('invalid json');
-      
+
       const stats = performanceMonitor.getSystemStats();
 
       expect(stats.totalProcessed).toBe(0);
@@ -156,15 +173,17 @@ describe('PerformanceMonitor', () => {
 
   describe('ヘルスチェック機能', () => {
     test('正常状態のヘルスチェック', () => {
-      mockProperties.getProperty.mockReturnValue(JSON.stringify({
-        totalProcessed: 100,
-        totalSuccess: 98,
-        totalErrors: 2,
-        overallSuccessRate: 98,
-        averageProcessingTime: 2000,
-        lastProcessedAt: new Date().toISOString(),
-        errorTrends: {}
-      }));
+      mockProperties.getProperty.mockReturnValue(
+        JSON.stringify({
+          totalProcessed: 100,
+          totalSuccess: 98,
+          totalErrors: 2,
+          overallSuccessRate: 98,
+          averageProcessingTime: 2000,
+          lastProcessedAt: new Date().toISOString(),
+          errorTrends: {},
+        })
+      );
 
       const health = performanceMonitor.healthCheck();
 
@@ -173,15 +192,17 @@ describe('PerformanceMonitor', () => {
     });
 
     test('警告状態のヘルスチェック（成功率低下）', () => {
-      mockProperties.getProperty.mockReturnValue(JSON.stringify({
-        totalProcessed: 100,
-        totalSuccess: 92,
-        totalErrors: 8,
-        overallSuccessRate: 92,
-        averageProcessingTime: 2000,
-        lastProcessedAt: new Date().toISOString(),
-        errorTrends: {}
-      }));
+      mockProperties.getProperty.mockReturnValue(
+        JSON.stringify({
+          totalProcessed: 100,
+          totalSuccess: 92,
+          totalErrors: 8,
+          overallSuccessRate: 92,
+          averageProcessingTime: 2000,
+          lastProcessedAt: new Date().toISOString(),
+          errorTrends: {},
+        })
+      );
 
       const health = performanceMonitor.healthCheck();
 
@@ -190,15 +211,17 @@ describe('PerformanceMonitor', () => {
     });
 
     test('危険状態のヘルスチェック（成功率大幅低下）', () => {
-      mockProperties.getProperty.mockReturnValue(JSON.stringify({
-        totalProcessed: 100,
-        totalSuccess: 85,
-        totalErrors: 15,
-        overallSuccessRate: 85,
-        averageProcessingTime: 2000,
-        lastProcessedAt: new Date().toISOString(),
-        errorTrends: {}
-      }));
+      mockProperties.getProperty.mockReturnValue(
+        JSON.stringify({
+          totalProcessed: 100,
+          totalSuccess: 85,
+          totalErrors: 15,
+          overallSuccessRate: 85,
+          averageProcessingTime: 2000,
+          lastProcessedAt: new Date().toISOString(),
+          errorTrends: {},
+        })
+      );
 
       const health = performanceMonitor.healthCheck();
 
@@ -207,15 +230,17 @@ describe('PerformanceMonitor', () => {
     });
 
     test('処理時間超過のヘルスチェック', () => {
-      mockProperties.getProperty.mockReturnValue(JSON.stringify({
-        totalProcessed: 100,
-        totalSuccess: 98,
-        totalErrors: 2,
-        overallSuccessRate: 98,
-        averageProcessingTime: 15000, // 15秒
-        lastProcessedAt: new Date().toISOString(),
-        errorTrends: {}
-      }));
+      mockProperties.getProperty.mockReturnValue(
+        JSON.stringify({
+          totalProcessed: 100,
+          totalSuccess: 98,
+          totalErrors: 2,
+          overallSuccessRate: 98,
+          averageProcessingTime: 15000, // 15秒
+          lastProcessedAt: new Date().toISOString(),
+          errorTrends: {},
+        })
+      );
 
       const health = performanceMonitor.healthCheck();
 
@@ -227,20 +252,24 @@ describe('PerformanceMonitor', () => {
       const oldDate = new Date();
       oldDate.setHours(oldDate.getHours() - 25); // 25時間前
 
-      mockProperties.getProperty.mockReturnValue(JSON.stringify({
-        totalProcessed: 100,
-        totalSuccess: 98,
-        totalErrors: 2,
-        overallSuccessRate: 98,
-        averageProcessingTime: 2000,
-        lastProcessedAt: oldDate.toISOString(),
-        errorTrends: {}
-      }));
+      mockProperties.getProperty.mockReturnValue(
+        JSON.stringify({
+          totalProcessed: 100,
+          totalSuccess: 98,
+          totalErrors: 2,
+          overallSuccessRate: 98,
+          averageProcessingTime: 2000,
+          lastProcessedAt: oldDate.toISOString(),
+          errorTrends: {},
+        })
+      );
 
       const health = performanceMonitor.healthCheck();
 
       expect(health.status).toBe('warning');
-      expect(health.issues).toContainEqual(expect.stringContaining('最終処理から25時間経過'));
+      expect(health.issues).toContainEqual(
+        expect.stringContaining('最終処理から25時間経過')
+      );
     });
   });
 
@@ -254,7 +283,7 @@ describe('PerformanceMonitor', () => {
       expect(report).toContain('平均処理時間: 3.00秒/行');
       expect(report).toContain('VALIDATION_ERROR: 3回');
       expect(report).toContain('API_ERROR: 2回');
-      
+
       expect(Logger.info).toHaveBeenCalledWith(
         'パフォーマンスレポート生成完了',
         'PerformanceMonitor'
@@ -262,22 +291,26 @@ describe('PerformanceMonitor', () => {
     });
 
     test('最適化推奨事項のレポート', () => {
-      mockProperties.getProperty.mockReturnValue(JSON.stringify({
-        totalProcessed: 100,
-        totalSuccess: 90, // 成功率低下
-        totalErrors: 10,
-        overallSuccessRate: 90,
-        averageProcessingTime: 8000, // 処理時間長い
-        lastProcessedAt: new Date().toISOString(),
-        errorTrends: { 'VALIDATION_ERROR': 8, 'API_ERROR': 2 }
-      }));
+      mockProperties.getProperty.mockReturnValue(
+        JSON.stringify({
+          totalProcessed: 100,
+          totalSuccess: 90, // 成功率低下
+          totalErrors: 10,
+          overallSuccessRate: 90,
+          averageProcessingTime: 8000, // 処理時間長い
+          lastProcessedAt: new Date().toISOString(),
+          errorTrends: { VALIDATION_ERROR: 8, API_ERROR: 2 },
+        })
+      );
 
       const report = performanceMonitor.generatePerformanceReport();
 
       expect(report).toContain('推奨事項');
       expect(report).toContain('エラー原因の詳細分析を実施してください');
       expect(report).toContain('大量データは分割処理を検討してください');
-      expect(report).toContain('頻発エラーの自動修復機能の追加を検討してください');
+      expect(report).toContain(
+        '頻発エラーの自動修復機能の追加を検討してください'
+      );
     });
   });
 
@@ -287,8 +320,8 @@ describe('PerformanceMonitor', () => {
       performanceMonitor.recordSuccess();
       performanceMonitor.recordSuccess();
       performanceMonitor.recordError('API_ERROR');
-      
-      const metrics = performanceMonitor.endMeasurement();
+
+      performanceMonitor.endMeasurement();
 
       // setPropertyが正しい統計情報で呼ばれることを確認
       expect(mockProperties.setProperty).toHaveBeenCalledWith(
@@ -324,7 +357,7 @@ describe('PerformanceMonitor', () => {
       performanceMonitor.startMeasurement(1);
       performanceMonitor.recordApiCall();
       performanceMonitor.recordApiCall();
-      
+
       const status = performanceMonitor.getCurrentStatus();
       expect(status.apiCallCount).toBe(2);
     });

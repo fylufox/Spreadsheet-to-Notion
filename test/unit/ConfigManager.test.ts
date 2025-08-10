@@ -15,7 +15,6 @@
  */
 
 import { ConfigManager } from '../../src/core/ConfigManager';
-import { ConfigError } from '../../src/types';
 import { CONSTANTS } from '../../src/utils/Constants';
 
 // モックシート作成のヘルパー関数

@@ -1,8 +1,23 @@
 /**
+ * Copyright 2025 Nakatani Naoya
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+/**
  * Basic Integration Tests
- * 
+ *
  * 基本的な統合テストのみを実装し、型エラーを回避します。
- * 
+ *
  * @license Apache-2.0
  */
 
@@ -18,22 +33,22 @@ const testMappings: ColumnMapping[] = [
     notionPropertyName: 'Title',
     dataType: 'title',
     isTarget: true,
-    isRequired: true
+    isRequired: true,
   },
   {
     spreadsheetColumn: 'description',
     notionPropertyName: 'Description',
     dataType: 'rich_text',
     isTarget: true,
-    isRequired: false
-  }
+    isRequired: false,
+  },
 ];
 
 const testConfig = {
   apiToken: 'test-token-123',
   databaseId: 'test-database-123',
   projectName: 'Test Project',
-  version: '1.0.0'
+  version: '1.0.0',
 };
 
 describe('Basic Integration Tests', () => {
@@ -41,11 +56,13 @@ describe('Basic Integration Tests', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    
+
     // ConfigManagerのモック
     jest.spyOn(ConfigManager, 'getConfig').mockResolvedValue(testConfig);
-    jest.spyOn(ConfigManager, 'getColumnMappings').mockReturnValue(testMappings);
-    
+    jest
+      .spyOn(ConfigManager, 'getColumnMappings')
+      .mockReturnValue(testMappings);
+
     triggerManager = TriggerManager.getInstance();
   });
 
@@ -101,7 +118,7 @@ describe('Basic Integration Tests', () => {
     it('should clear log history', () => {
       Logger.info('Test message');
       expect(Logger.getHistory().length).toBeGreaterThan(0);
-      
+
       Logger.clearHistory();
       expect(Logger.getHistory().length).toBe(0);
     });
@@ -110,7 +127,9 @@ describe('Basic Integration Tests', () => {
   describe('Error Handling Integration', () => {
     it('should handle configuration errors gracefully', async () => {
       // ConfigManagerで設定エラーを発生させる
-      jest.spyOn(ConfigManager, 'getConfig').mockRejectedValue(new Error('Config error'));
+      jest
+        .spyOn(ConfigManager, 'getConfig')
+        .mockRejectedValue(new Error('Config error'));
 
       try {
         await triggerManager.processImport(2);

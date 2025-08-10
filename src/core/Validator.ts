@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { ValidationResult, ColumnMapping, ValidationError } from '../types';
+import { ValidationResult, ColumnMapping } from '../types';
 import { CONSTANTS } from '../utils/Constants';
 import { Logger } from '../utils/Logger';
 

@@ -18,39 +18,36 @@ import { TriggerManager } from '../../src/core/TriggerManager';
 import { ConfigManager } from '../../src/core/ConfigManager';
 import { Validator } from '../../src/core/Validator';
 import { DataMapper } from '../../src/core/DataMapper';
-import { NotionApiClient } from '../../src/core/NotionApiClient';
 import { Logger } from '../../src/utils/Logger';
 import { CONSTANTS } from '../../src/utils/Constants';
-import { EditEvent, ImportResult } from '../../src/types';
+import { EditEvent } from '../../src/types';
 
 // 依存モジュールのモック
 jest.mock('../../src/core/ConfigManager');
 jest.mock('../../src/core/Validator');
 jest.mock('../../src/core/DataMapper');
-jest.mock('../../src/core/NotionApiClient');
 jest.mock('../../src/utils/Logger');
 
 const mockConfigManager = ConfigManager as jest.Mocked<typeof ConfigManager>;
 const mockValidator = Validator as jest.Mocked<typeof Validator>;
 const mockDataMapper = DataMapper as jest.Mocked<typeof DataMapper>;
-const mockNotionApiClient = NotionApiClient as jest.Mocked<typeof NotionApiClient>;
 const mockLogger = Logger as jest.Mocked<typeof Logger>;
 
 // Google Apps Script APIのグローバルモック
 const mockSpreadsheetApp = {
   getActiveSpreadsheet: jest.fn(),
-  getUi: jest.fn(() => mockUi)
+  getUi: jest.fn(() => mockUi),
 };
 
 const mockSession = {
-  getActiveUser: jest.fn()
+  getActiveUser: jest.fn(),
 };
 
 const mockUi = {
   alert: jest.fn(),
   ButtonSet: {
-    OK: 'OK'
-  }
+    OK: 'OK',
+  },
 };
 
 // グローバルスコープにモックを設定
@@ -71,19 +68,21 @@ describe('TriggerManager', () => {
     mockSheet = {
       getLastColumn: jest.fn().mockReturnValue(10),
       getRange: jest.fn(),
-      getValues: jest.fn()
+      getValues: jest.fn(),
     };
 
     mockRange = {
       getRow: jest.fn().mockReturnValue(2),
       getColumn: jest.fn().mockReturnValue(CONSTANTS.COLUMNS.CHECKBOX),
-      getValues: jest.fn().mockReturnValue([['Test Title', '', 'In Progress', '']]), // 主キー列(B列)を空にする
-      setValue: jest.fn()
+      getValues: jest
+        .fn()
+        .mockReturnValue([['Test Title', '', 'In Progress', '']]), // 主キー列(B列)を空にする
+      setValue: jest.fn(),
     };
 
     mockSpreadsheet = {
       getSheetByName: jest.fn().mockReturnValue(mockSheet),
-      getUi: jest.fn().mockReturnValue(mockUi)
+      getUi: jest.fn().mockReturnValue(mockUi),
     };
 
     mockSheet.getRange.mockReturnValue(mockRange);
@@ -91,7 +90,7 @@ describe('TriggerManager', () => {
 
     mockSession.getActiveUser.mockReturnValue({
       getEmail: jest.fn().mockReturnValue('test@example.com'),
-      getUserLoginId: jest.fn().mockReturnValue('test-user-id')
+      getUserLoginId: jest.fn().mockReturnValue('test-user-id'),
     });
 
     // ConfigManagerのモック
@@ -99,7 +98,7 @@ describe('TriggerManager', () => {
       databaseId: 'test-database-id',
       projectName: 'test-project',
       version: '1.0.0',
-      apiToken: 'test-api-token'
+      apiToken: 'test-api-token',
     });
 
     mockConfigManager.getColumnMappings.mockReturnValue([
@@ -108,30 +107,30 @@ describe('TriggerManager', () => {
         notionPropertyName: 'Title',
         dataType: 'title',
         isRequired: true,
-        isTarget: true
+        isTarget: true,
       },
       {
         spreadsheetColumn: 'B',
         notionPropertyName: 'Status',
         dataType: 'select',
         isRequired: false,
-        isTarget: true
-      }
+        isTarget: true,
+      },
     ]);
 
     // Validatorのモック
     mockValidator.validateRowData.mockReturnValue({
       valid: true,
-      errors: []
+      errors: [],
     });
 
     // DataMapperのモック
     mockDataMapper.mapRowToNotionPage.mockReturnValue({
       properties: {
-        'Title': {
-          title: [{ text: { content: 'Test Title' } }]
-        }
-      }
+        Title: {
+          title: [{ text: { content: 'Test Title' } }],
+        },
+      },
     });
 
     // Loggerのモック
@@ -151,17 +150,17 @@ describe('TriggerManager', () => {
       createPage: jest.fn().mockResolvedValue({
         id: 'test-page-id',
         created_time: '2025-01-01T00:00:00.000Z',
-        properties: {}
+        properties: {},
       }),
       updatePage: jest.fn().mockResolvedValue({
         id: 'existing-page-id',
         last_edited_time: '2025-01-01T00:00:00.000Z',
-        properties: {}
+        properties: {},
       }),
       testConnection: jest.fn().mockResolvedValue({
         success: true,
-        message: '接続テストが成功しました'
-      })
+        message: '接続テストが成功しました',
+      }),
     };
 
     // TriggerManager内のNotionApiClientインスタンスを置き換え
@@ -175,12 +174,15 @@ describe('TriggerManager', () => {
         value: true,
         oldValue: false,
         source: mockSpreadsheet as any,
-        user: mockSession.getActiveUser() as any
+        user: mockSession.getActiveUser() as any,
       };
 
       await triggerManager.onEdit(mockEvent);
 
-      expect(mockLogger.info).toHaveBeenCalledWith('Edit event triggered', expect.any(Object));
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'Edit event triggered',
+        expect.any(Object)
+      );
       expect(mockConfigManager.getConfig).toHaveBeenCalled();
       expect(mockConfigManager.getColumnMappings).toHaveBeenCalled();
       expect(mockValidator.validateRowData).toHaveBeenCalled();
@@ -195,12 +197,14 @@ describe('TriggerManager', () => {
         value: true,
         oldValue: false,
         source: mockSpreadsheet as any,
-        user: mockSession.getActiveUser() as any
+        user: mockSession.getActiveUser() as any,
       };
 
       await triggerManager.onEdit(mockEvent);
 
-      expect(mockLogger.debug).toHaveBeenCalledWith('Edit is not in checkbox column, skipping');
+      expect(mockLogger.debug).toHaveBeenCalledWith(
+        'Edit is not in checkbox column, skipping'
+      );
       expect(mockConfigManager.getConfig).not.toHaveBeenCalled();
     });
 
@@ -210,12 +214,14 @@ describe('TriggerManager', () => {
         value: false, // Checkbox not checked
         oldValue: false,
         source: mockSpreadsheet as any,
-        user: mockSession.getActiveUser() as any
+        user: mockSession.getActiveUser() as any,
       };
 
       await triggerManager.onEdit(mockEvent);
 
-      expect(mockLogger.debug).toHaveBeenCalledWith('Checkbox is not checked, skipping');
+      expect(mockLogger.debug).toHaveBeenCalledWith(
+        'Checkbox is not checked, skipping'
+      );
       expect(mockConfigManager.getConfig).not.toHaveBeenCalled();
     });
 
@@ -224,13 +230,13 @@ describe('TriggerManager', () => {
 
       for (const value of testValues) {
         jest.clearAllMocks();
-        
+
         const mockEvent: EditEvent = {
           range: mockRange,
           value: value,
           oldValue: false,
           source: mockSpreadsheet as any,
-          user: mockSession.getActiveUser() as any
+          user: mockSession.getActiveUser() as any,
         };
 
         await triggerManager.onEdit(mockEvent);
@@ -245,7 +251,7 @@ describe('TriggerManager', () => {
         value: true,
         oldValue: false,
         source: mockSpreadsheet as any,
-        user: mockSession.getActiveUser() as any
+        user: mockSession.getActiveUser() as any,
       };
 
       // 最初の処理を開始（processImportが非同期で実行される前に2回目を実行）
@@ -254,7 +260,9 @@ describe('TriggerManager', () => {
 
       await Promise.all([promise1, promise2]);
 
-      expect(mockLogger.warn).toHaveBeenCalledWith('Processing already in progress, skipping');
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'Processing already in progress, skipping'
+      );
     });
   });
 
@@ -266,25 +274,29 @@ describe('TriggerManager', () => {
 
       expect(result.success).toBe(true);
       expect(result.result?.id).toBe('test-page-id');
-      expect(mockSheet.getRange).toHaveBeenCalledWith(rowNumber, CONSTANTS.COLUMNS.PRIMARY_KEY);
+      expect(mockSheet.getRange).toHaveBeenCalledWith(
+        rowNumber,
+        CONSTANTS.COLUMNS.PRIMARY_KEY
+      );
       expect(mockRange.setValue).toHaveBeenCalledWith('test-page-id');
     });
 
     it('should update existing Notion page', async () => {
       const rowNumber = 2;
       const existingPageId = 'existing-page-id';
-      
+
       // 主キー列(B列=インデックス1)に既存のページIDがある場合のデータを設定
-      mockRange.getValues.mockReturnValue([['Test Title', existingPageId, 'In Progress', '']]);
+      mockRange.getValues.mockReturnValue([
+        ['Test Title', existingPageId, 'In Progress', ''],
+      ]);
 
       const result = await triggerManager.processImport(rowNumber);
 
       expect(result.success).toBe(true);
       expect(result.result?.id).toBe('existing-page-id');
-      expect((triggerManager as any).notionApiClient.updatePage).toHaveBeenCalledWith(
-        existingPageId,
-        expect.any(Object)
-      );
+      expect(
+        (triggerManager as any).notionApiClient.updatePage
+      ).toHaveBeenCalledWith(existingPageId, expect.any(Object));
     });
 
     it('should handle validation errors', async () => {
@@ -292,7 +304,7 @@ describe('TriggerManager', () => {
 
       mockValidator.validateRowData.mockReturnValue({
         valid: false,
-        errors: ['Title is required', 'Invalid data format']
+        errors: ['Title is required', 'Invalid data format'],
       });
 
       const result = await triggerManager.processImport(rowNumber);
@@ -305,9 +317,9 @@ describe('TriggerManager', () => {
       const rowNumber = 2;
 
       // モックのAPIクライアントでエラーを発生させる
-      (triggerManager as any).notionApiClient.createPage = jest.fn().mockRejectedValue(
-        new Error('API connection failed')
-      );
+      (triggerManager as any).notionApiClient.createPage = jest
+        .fn()
+        .mockRejectedValue(new Error('API connection failed'));
 
       const result = await triggerManager.processImport(rowNumber);
 
@@ -324,7 +336,9 @@ describe('TriggerManager', () => {
 
       expect(result.success).toBe(false);
       // getRowDataがシートがないことを検出した場合のエラーメッセージを確認
-      expect(result.error?.message).toMatch(/行データの取得に失敗しました|シート.*が見つかりません/);
+      expect(result.error?.message).toMatch(
+        /行データの取得に失敗しました|シート.*が見つかりません/
+      );
     });
   });
 
@@ -343,25 +357,30 @@ describe('TriggerManager', () => {
 
       // 2つ目のモックRangeを作成（主キー記録用）
       const mockPrimaryKeyRange = {
-        setValue: jest.fn()
+        setValue: jest.fn(),
       };
 
       // getRange呼び出しに応じて異なるモックを返す
-      mockSheet.getRange.mockImplementation((row: number, col: number, numRows?: number, numCols?: number) => {
-        if (numRows && numCols) {
-          // 行データ取得用
+      mockSheet.getRange.mockImplementation(
+        (row: number, col: number, numRows?: number, numCols?: number) => {
+          if (numRows && numCols) {
+            // 行データ取得用
+            return mockRange;
+          } else if (col === CONSTANTS.COLUMNS.PRIMARY_KEY) {
+            // 主キー記録用
+            return mockPrimaryKeyRange;
+          }
           return mockRange;
-        } else if (col === CONSTANTS.COLUMNS.PRIMARY_KEY) {
-          // 主キー記録用
-          return mockPrimaryKeyRange;
         }
-        return mockRange;
-      });
+      );
 
       await triggerManager.processImport(rowNumber);
 
       // 主キー記録の呼び出しを確認
-      expect(mockSheet.getRange).toHaveBeenCalledWith(rowNumber, CONSTANTS.COLUMNS.PRIMARY_KEY);
+      expect(mockSheet.getRange).toHaveBeenCalledWith(
+        rowNumber,
+        CONSTANTS.COLUMNS.PRIMARY_KEY
+      );
       expect(mockPrimaryKeyRange.setValue).toHaveBeenCalledWith('test-page-id');
     });
 
@@ -405,7 +424,9 @@ describe('TriggerManager', () => {
 
       const status = triggerManager.getProcessingStatus();
       expect(status.errorHistory.length).toBeGreaterThan(0);
-      expect(status.errorHistory[status.errorHistory.length - 1].error).toContain('Config error');
+      expect(
+        status.errorHistory[status.errorHistory.length - 1].error
+      ).toContain('Config error');
     });
 
     it('should clear error history', () => {
@@ -426,9 +447,9 @@ describe('TriggerManager', () => {
 
     it('should handle connection test failure', async () => {
       // モックのAPIクライアントでエラーを発生させる
-      (triggerManager as any).notionApiClient.testConnection = jest.fn().mockRejectedValue(
-        new Error('Connection failed')
-      );
+      (triggerManager as any).notionApiClient.testConnection = jest
+        .fn()
+        .mockRejectedValue(new Error('Connection failed'));
 
       const result = await triggerManager.testConnection();
 
@@ -443,10 +464,10 @@ describe('TriggerManager', () => {
       expect(statusBefore.isProcessing).toBe(false);
 
       const promise = triggerManager.processImport(2);
-      
+
       // 処理中の状態は外部からは確認できないが、完了後に確認
-      const result = await promise;
-      
+      await promise;
+
       const statusAfter = triggerManager.getProcessingStatus();
       expect(statusAfter.isProcessing).toBe(false);
       expect(statusAfter.lastProcessTime).toBeGreaterThan(0);

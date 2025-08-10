@@ -15,7 +15,7 @@
  */
 
 import { Validator } from '../../src/core/Validator';
-import { ColumnMapping, ValidationResult } from '../../src/types';
+import { ColumnMapping } from '../../src/types';
 import { CONSTANTS } from '../../src/utils/Constants';
 
 // Logger のモック

@@ -5,6 +5,21 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+/**
+ * Copyright 2025 Nakatani Naoya
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
@@ -68,7 +83,7 @@ export interface SystemStats {
  */
 export class PerformanceMonitor {
   private currentMetrics: Partial<PerformanceMetrics> = {};
-  
+
   constructor() {
     // Loggerは静的メソッドを使用
   }
@@ -83,25 +98,31 @@ export class PerformanceMonitor {
       processedRows: 0,
       apiCallCount: 0,
       successCount: 0,
-      errorCount: 0
+      errorCount: 0,
     };
 
-    Logger.info(`パフォーマンス測定開始: 予定処理行数 ${expectedRows}行`, 'PerformanceMonitor');
+    Logger.info(
+      `パフォーマンス測定開始: 予定処理行数 ${expectedRows}行`,
+      'PerformanceMonitor'
+    );
   }
 
   /**
    * API呼び出しをカウント
    */
   recordApiCall(): void {
-    this.currentMetrics.apiCallCount = (this.currentMetrics.apiCallCount || 0) + 1;
+    this.currentMetrics.apiCallCount =
+      (this.currentMetrics.apiCallCount || 0) + 1;
   }
 
   /**
    * 成功処理をカウント
    */
   recordSuccess(): void {
-    this.currentMetrics.successCount = (this.currentMetrics.successCount || 0) + 1;
-    this.currentMetrics.processedRows = (this.currentMetrics.processedRows || 0) + 1;
+    this.currentMetrics.successCount =
+      (this.currentMetrics.successCount || 0) + 1;
+    this.currentMetrics.processedRows =
+      (this.currentMetrics.processedRows || 0) + 1;
   }
 
   /**
@@ -110,8 +131,9 @@ export class PerformanceMonitor {
    */
   recordError(errorType: string): void {
     this.currentMetrics.errorCount = (this.currentMetrics.errorCount || 0) + 1;
-    this.currentMetrics.processedRows = (this.currentMetrics.processedRows || 0) + 1;
-    
+    this.currentMetrics.processedRows =
+      (this.currentMetrics.processedRows || 0) + 1;
+
     Logger.warn(`エラー発生をカウント: ${errorType}`, 'PerformanceMonitor');
   }
 
@@ -123,7 +145,7 @@ export class PerformanceMonitor {
     const endTime = new Date();
     const startTime = this.currentMetrics.startTime || endTime;
     const totalTime = endTime.getTime() - startTime.getTime();
-    
+
     const processedRows = this.currentMetrics.processedRows || 0;
     const successCount = this.currentMetrics.successCount || 0;
     const errorCount = this.currentMetrics.errorCount || 0;
@@ -138,10 +160,13 @@ export class PerformanceMonitor {
       successCount,
       errorCount,
       successRate: processedRows > 0 ? (successCount / processedRows) * 100 : 0,
-      memoryUsage: this.getMemoryUsage()
+      memoryUsage: this.getMemoryUsage(),
     };
 
-    Logger.info(`パフォーマンス測定完了: ${totalTime}ms, 処理行数: ${processedRows}, 成功率: ${metrics.successRate.toFixed(1)}%, 平均処理時間: ${metrics.averageTimePerRow.toFixed(1)}ms/row`, 'PerformanceMonitor');
+    Logger.info(
+      `パフォーマンス測定完了: ${totalTime}ms, 処理行数: ${processedRows}, 成功率: ${metrics.successRate.toFixed(1)}%, 平均処理時間: ${metrics.averageTimePerRow.toFixed(1)}ms/row`,
+      'PerformanceMonitor'
+    );
 
     // 統計情報を記録
     this.recordStats(metrics);
@@ -159,14 +184,18 @@ export class PerformanceMonitor {
     }
 
     const currentTime = new Date();
-    const elapsedTime = currentTime.getTime() - this.currentMetrics.startTime.getTime();
+    const elapsedTime =
+      currentTime.getTime() - this.currentMetrics.startTime.getTime();
     const processedRows = this.currentMetrics.processedRows || 0;
 
     return {
       ...this.currentMetrics,
       totalTime: elapsedTime,
       averageTimePerRow: processedRows > 0 ? elapsedTime / processedRows : 0,
-      successRate: processedRows > 0 ? ((this.currentMetrics.successCount || 0) / processedRows) * 100 : 0
+      successRate:
+        processedRows > 0
+          ? ((this.currentMetrics.successCount || 0) / processedRows) * 100
+          : 0,
     };
   }
 
@@ -178,16 +207,19 @@ export class PerformanceMonitor {
     try {
       const properties = PropertiesService.getScriptProperties();
       const statsJson = properties.getProperty('system_stats');
-      
+
       if (statsJson) {
         const stats = JSON.parse(statsJson);
         return {
           ...stats,
-          lastProcessedAt: new Date(stats.lastProcessedAt)
+          lastProcessedAt: new Date(stats.lastProcessedAt),
         };
       }
     } catch (error) {
-      Logger.warn(`統計情報の取得に失敗: ${String(error)}`, 'PerformanceMonitor');
+      Logger.warn(
+        `統計情報の取得に失敗: ${String(error)}`,
+        'PerformanceMonitor'
+      );
     }
 
     // デフォルト統計情報
@@ -198,7 +230,7 @@ export class PerformanceMonitor {
       overallSuccessRate: 0,
       averageProcessingTime: 0,
       lastProcessedAt: new Date(),
-      errorTrends: {}
+      errorTrends: {},
     };
   }
 
@@ -206,7 +238,10 @@ export class PerformanceMonitor {
    * システムヘルスチェックを実行
    * @returns ヘルスチェック結果
    */
-  healthCheck(): { status: 'healthy' | 'warning' | 'critical'; issues: string[] } {
+  healthCheck(): {
+    status: 'healthy' | 'warning' | 'critical';
+    issues: string[];
+  } {
     const stats = this.getSystemStats();
     const issues: string[] = [];
     let status: 'healthy' | 'warning' | 'critical' = 'healthy';
@@ -221,19 +256,27 @@ export class PerformanceMonitor {
     }
 
     // 平均処理時間チェック
-    if (stats.averageProcessingTime > 10000) { // 10秒超
-      issues.push(`処理時間が長い: ${(stats.averageProcessingTime / 1000).toFixed(1)}秒/行`);
+    if (stats.averageProcessingTime > 10000) {
+      // 10秒超
+      issues.push(
+        `処理時間が長い: ${(stats.averageProcessingTime / 1000).toFixed(1)}秒/行`
+      );
       if (status === 'healthy') status = 'warning';
     }
 
     // 最終処理時刻チェック（24時間以上前の場合）
-    const hoursSinceLastProcess = (new Date().getTime() - stats.lastProcessedAt.getTime()) / (1000 * 60 * 60);
+    const hoursSinceLastProcess =
+      (new Date().getTime() - stats.lastProcessedAt.getTime()) /
+      (1000 * 60 * 60);
     if (hoursSinceLastProcess > 24) {
       issues.push(`最終処理から${Math.floor(hoursSinceLastProcess)}時間経過`);
       if (status === 'healthy') status = 'warning';
     }
 
-    Logger.info(`ヘルスチェック完了: ${status}, 課題: ${issues.join(', ')}`, 'PerformanceMonitor');
+    Logger.info(
+      `ヘルスチェック完了: ${status}, 課題: ${issues.join(', ')}`,
+      'PerformanceMonitor'
+    );
 
     return { status, issues };
   }
@@ -243,7 +286,7 @@ export class PerformanceMonitor {
    * @param period 期間（日数）
    * @returns レポート文字列
    */
-  generatePerformanceReport(period: number = 7): string {
+  generatePerformanceReport(period = 7): string {
     const stats = this.getSystemStats();
     const health = this.healthCheck();
 
@@ -260,9 +303,11 @@ export class PerformanceMonitor {
 ${health.issues.length > 0 ? '⚠️ 課題:\n' + health.issues.map(issue => `  • ${issue}`).join('\n') : '✅ 問題なし'}
 
 📈 エラー傾向:
-${Object.entries(stats.errorTrends).map(([type, count]) => `• ${type}: ${count}回`).join('\n')}
+${Object.entries(stats.errorTrends)
+  .map(([type, count]) => `• ${type}: ${count}回`)
+  .join('\n')}
 
-${this.generateRecommendations(stats, health)}
+${this.generateRecommendations(stats)}
     `.trim();
 
     Logger.info('パフォーマンスレポート生成完了', 'PerformanceMonitor');
@@ -272,15 +317,16 @@ ${this.generateRecommendations(stats, health)}
   /**
    * 推奨事項を生成
    * @param stats 統計情報
-   * @param health ヘルス状況
    * @returns 推奨事項
    */
-  private generateRecommendations(stats: SystemStats, health: { status: string; issues: string[] }): string {
+  private generateRecommendations(stats: SystemStats): string {
     const recommendations: string[] = [];
 
     if (stats.overallSuccessRate < 95) {
       recommendations.push('• エラー原因の詳細分析を実施してください');
-      recommendations.push('• データ入力ガイドラインの見直しを検討してください');
+      recommendations.push(
+        '• データ入力ガイドラインの見直しを検討してください'
+      );
     }
 
     if (stats.averageProcessingTime > 5000) {
@@ -289,12 +335,14 @@ ${this.generateRecommendations(stats, health)}
     }
 
     if (Object.keys(stats.errorTrends).length > 0) {
-      recommendations.push('• 頻発エラーの自動修復機能の追加を検討してください');
+      recommendations.push(
+        '• 頻発エラーの自動修復機能の追加を検討してください'
+      );
     }
 
-    return recommendations.length > 0 ? 
-      `\n💡 推奨事項:\n${recommendations.join('\n')}` : 
-      '\n✨ システムは最適な状態で動作しています';
+    return recommendations.length > 0
+      ? `\n💡 推奨事項:\n${recommendations.join('\n')}`
+      : '\n✨ システムは最適な状態で動作しています';
   }
 
   /**
@@ -304,7 +352,7 @@ ${this.generateRecommendations(stats, health)}
   private recordStats(metrics: PerformanceMetrics): void {
     try {
       const currentStats = this.getSystemStats();
-      
+
       const updatedStats: SystemStats = {
         totalProcessed: currentStats.totalProcessed + metrics.processedRows,
         totalSuccess: currentStats.totalSuccess + metrics.successCount,
@@ -312,26 +360,37 @@ ${this.generateRecommendations(stats, health)}
         overallSuccessRate: 0, // 下で計算
         averageProcessingTime: 0, // 下で計算
         lastProcessedAt: metrics.endTime,
-        errorTrends: { ...currentStats.errorTrends }
+        errorTrends: { ...currentStats.errorTrends },
       };
 
       // 成功率を計算
-      updatedStats.overallSuccessRate = updatedStats.totalProcessed > 0 ? 
-        (updatedStats.totalSuccess / updatedStats.totalProcessed) * 100 : 0;
+      updatedStats.overallSuccessRate =
+        updatedStats.totalProcessed > 0
+          ? (updatedStats.totalSuccess / updatedStats.totalProcessed) * 100
+          : 0;
 
       // 平均処理時間を更新（移動平均）
       const totalWeight = currentStats.totalProcessed + metrics.processedRows;
-      updatedStats.averageProcessingTime = totalWeight > 0 ?
-        ((currentStats.averageProcessingTime * currentStats.totalProcessed) + 
-         (metrics.averageTimePerRow * metrics.processedRows)) / totalWeight : 0;
+      updatedStats.averageProcessingTime =
+        totalWeight > 0
+          ? (currentStats.averageProcessingTime * currentStats.totalProcessed +
+              metrics.averageTimePerRow * metrics.processedRows) /
+            totalWeight
+          : 0;
 
       // 統計情報を保存
       const properties = PropertiesService.getScriptProperties();
       properties.setProperty('system_stats', JSON.stringify(updatedStats));
 
-      Logger.debug(`統計情報を更新: 総処理数=${updatedStats.totalProcessed}, 成功率=${updatedStats.overallSuccessRate.toFixed(1)}%`, 'PerformanceMonitor');
+      Logger.debug(
+        `統計情報を更新: 総処理数=${updatedStats.totalProcessed}, 成功率=${updatedStats.overallSuccessRate.toFixed(1)}%`,
+        'PerformanceMonitor'
+      );
     } catch (error) {
-      Logger.error(`統計情報の記録に失敗: ${String(error)}`, 'PerformanceMonitor');
+      Logger.error(
+        `統計情報の記録に失敗: ${String(error)}`,
+        'PerformanceMonitor'
+      );
     }
   }
 
@@ -343,7 +402,9 @@ ${this.generateRecommendations(stats, health)}
     try {
       // Google Apps Scriptでは正確なメモリ使用量取得は困難
       // 処理データ量から概算
-      return this.currentMetrics.processedRows ? this.currentMetrics.processedRows * 1024 : 0;
+      return this.currentMetrics.processedRows
+        ? this.currentMetrics.processedRows * 1024
+        : 0;
     } catch {
       return 0;
     }

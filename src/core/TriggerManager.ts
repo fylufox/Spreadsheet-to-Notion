@@ -26,10 +26,8 @@ import {
   ImportContext,
   ImportResult,
   ProcessingStatus,
-  SystemConfig,
-  ColumnMapping,
   ErrorType,
-  SpreadsheetToNotionError
+  SpreadsheetToNotionError,
 } from '../types';
 
 /**
@@ -48,7 +46,7 @@ export class TriggerManager {
     this.processingStatus = {
       isProcessing: false,
       lastProcessTime: 0,
-      errorHistory: []
+      errorHistory: [],
     };
   }
 
@@ -71,7 +69,7 @@ export class TriggerManager {
         row: e.range.getRow(),
         column: e.range.getColumn(),
         value: e.value,
-        oldValue: e.oldValue
+        oldValue: e.oldValue,
       });
 
       // 重複実行防止
@@ -97,11 +95,10 @@ export class TriggerManager {
 
       // メイン処理実行
       await this.processImport(e.range.getRow());
-
     } catch (error) {
-      this.handleError(error, { 
-        context: 'onEdit', 
-        rowNumber: e.range.getRow() 
+      this.handleError(error, {
+        context: 'onEdit',
+        rowNumber: e.range.getRow(),
       });
     }
   }
@@ -110,10 +107,10 @@ export class TriggerManager {
    * 指定行のデータインポート処理
    */
   async processImport(rowNumber: number): Promise<ImportResult> {
-    const context: ImportContext = { 
-      rowNumber, 
+    const context: ImportContext = {
+      rowNumber,
       timestamp: new Date(),
-      userId: this.getCurrentUserId()
+      userId: this.getCurrentUserId(),
     };
 
     this.processingStatus.isProcessing = true;
@@ -149,21 +146,36 @@ export class TriggerManager {
 
       // 既存ページの確認（主キー列の値）
       const primaryKeyColumnIndex = this.getPrimaryKeyColumnIndex();
-      const existingPageId = primaryKeyColumnIndex >= 0 ? rowData[primaryKeyColumnIndex] : null;
+      const existingPageId =
+        primaryKeyColumnIndex >= 0 ? rowData[primaryKeyColumnIndex] : null;
 
       let result;
-      
-      if (existingPageId && typeof existingPageId === 'string' && existingPageId.trim()) {
+
+      if (
+        existingPageId &&
+        typeof existingPageId === 'string' &&
+        existingPageId.trim()
+      ) {
         // 既存ページの更新
-        Logger.info('Updating existing Notion page', { pageId: existingPageId });
+        Logger.info('Updating existing Notion page', {
+          pageId: existingPageId,
+        });
         this.performanceMonitor.recordApiCall();
-        result = await this.notionApiClient.updatePage(existingPageId.trim(), notionData);
+        result = await this.notionApiClient.updatePage(
+          existingPageId.trim(),
+          notionData
+        );
       } else {
         // 新規ページの作成
-        Logger.info('Creating new Notion page', { databaseId: config.databaseId });
+        Logger.info('Creating new Notion page', {
+          databaseId: config.databaseId,
+        });
         this.performanceMonitor.recordApiCall();
-        result = await this.notionApiClient.createPage(config.databaseId, notionData);
-        
+        result = await this.notionApiClient.createPage(
+          config.databaseId,
+          notionData
+        );
+
         // 主キーを記録
         if (primaryKeyColumnIndex >= 0) {
           this.recordPrimaryKey(rowNumber, result.id);
@@ -175,27 +187,34 @@ export class TriggerManager {
 
       // 成功通知
       this.showSuccessMessage('データの連携が完了しました');
-      Logger.info('Import process completed successfully', { 
-        rowNumber, 
-        pageId: result.id 
+      Logger.info('Import process completed successfully', {
+        rowNumber,
+        pageId: result.id,
       });
 
       // パフォーマンス測定終了
       const metrics = this.performanceMonitor.endMeasurement();
-      Logger.info(`処理完了 - 処理時間: ${metrics.totalTime}ms, 成功率: ${metrics.successRate}%`);
+      Logger.info(
+        `処理完了 - 処理時間: ${metrics.totalTime}ms, 成功率: ${metrics.successRate}%`
+      );
 
       return { success: true, result, performanceMetrics: metrics };
-
     } catch (error) {
-      this.performanceMonitor.recordError(error instanceof SpreadsheetToNotionError ? error.type : 'UNKNOWN_ERROR');
-      
+      this.performanceMonitor.recordError(
+        error instanceof SpreadsheetToNotionError ? error.type : 'UNKNOWN_ERROR'
+      );
+
       Logger.error('Import process failed', { error, context });
       this.handleError(error, { context: 'processImport', ...context });
-      
+
       // パフォーマンス測定終了
       const metrics = this.performanceMonitor.endMeasurement();
-      
-      return { success: false, error: error as Error, performanceMetrics: metrics };
+
+      return {
+        success: false,
+        error: error as Error,
+        performanceMetrics: metrics,
+      };
     } finally {
       this.processingStatus.isProcessing = false;
     }
@@ -240,16 +259,19 @@ export class TriggerManager {
    */
   private getRowData(rowNumber: number): any[] {
     try {
-      const sheet = SpreadsheetApp.getActiveSpreadsheet()
-        .getSheetByName(CONSTANTS.SHEETS.IMPORT_DATA);
-      
+      const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(
+        CONSTANTS.SHEETS.IMPORT_DATA
+      );
+
       if (!sheet) {
-        throw new Error(`シート "${CONSTANTS.SHEETS.IMPORT_DATA}" が見つかりません`);
+        throw new Error(
+          `シート "${CONSTANTS.SHEETS.IMPORT_DATA}" が見つかりません`
+        );
       }
 
       const lastColumn = sheet.getLastColumn();
       const range = sheet.getRange(rowNumber, 1, 1, lastColumn);
-      
+
       return range.getValues()[0];
     } catch (error) {
       throw new SpreadsheetToNotionError(
@@ -272,19 +294,25 @@ export class TriggerManager {
    */
   private recordPrimaryKey(rowNumber: number, pageId: string): void {
     try {
-      const sheet = SpreadsheetApp.getActiveSpreadsheet()
-        .getSheetByName(CONSTANTS.SHEETS.IMPORT_DATA);
-      
+      const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(
+        CONSTANTS.SHEETS.IMPORT_DATA
+      );
+
       if (!sheet) {
-        throw new Error(`シート "${CONSTANTS.SHEETS.IMPORT_DATA}" が見つかりません`);
+        throw new Error(
+          `シート "${CONSTANTS.SHEETS.IMPORT_DATA}" が見つかりません`
+        );
       }
 
-      sheet.getRange(rowNumber, CONSTANTS.COLUMNS.PRIMARY_KEY)
-        .setValue(pageId);
-      
+      sheet.getRange(rowNumber, CONSTANTS.COLUMNS.PRIMARY_KEY).setValue(pageId);
+
       Logger.info('Primary key recorded', { rowNumber, pageId });
     } catch (error) {
-      Logger.error('Failed to record primary key', { error, rowNumber, pageId });
+      Logger.error('Failed to record primary key', {
+        error,
+        rowNumber,
+        pageId,
+      });
       // 主キー記録の失敗は処理全体を止めない
     }
   }
@@ -295,8 +323,8 @@ export class TriggerManager {
   private showSuccessMessage(message: string): void {
     try {
       SpreadsheetApp.getUi().alert(
-        '成功', 
-        message, 
+        '成功',
+        message,
         SpreadsheetApp.getUi().ButtonSet.OK
       );
     } catch (error) {
@@ -311,8 +339,8 @@ export class TriggerManager {
   private showErrorMessage(message: string): void {
     try {
       SpreadsheetApp.getUi().alert(
-        'エラー', 
-        message, 
+        'エラー',
+        message,
         SpreadsheetApp.getUi().ButtonSet.OK
       );
     } catch (error) {
@@ -340,7 +368,7 @@ export class TriggerManager {
     this.processingStatus.errorHistory.push({
       timestamp: new Date(),
       error: error instanceof Error ? error.message : String(error),
-      context
+      context,
     });
 
     // エラー履歴の制限（最新100件まで）
@@ -353,7 +381,7 @@ export class TriggerManager {
 
     // ユーザーへの通知
     let userMessage = 'データの連携中にエラーが発生しました。';
-    
+
     if (error instanceof SpreadsheetToNotionError) {
       switch (error.type) {
         case ErrorType.CONFIG_ERROR:
@@ -363,10 +391,12 @@ export class TriggerManager {
           userMessage = `データに問題があります: ${error.message}`;
           break;
         case ErrorType.API_ERROR:
-          userMessage = 'Notion APIとの通信でエラーが発生しました。しばらく待ってから再試行してください。';
+          userMessage =
+            'Notion APIとの通信でエラーが発生しました。しばらく待ってから再試行してください。';
           break;
         case ErrorType.PERMISSION_ERROR:
-          userMessage = 'アクセス権限がありません。管理者にお問い合わせください。';
+          userMessage =
+            'アクセス権限がありません。管理者にお問い合わせください。';
           break;
         default:
           userMessage = `エラー: ${error.message}`;
@@ -431,7 +461,7 @@ export class TriggerManager {
       Logger.error('Connection test failed', { error });
       return {
         success: false,
-        message: `接続テストに失敗しました: ${error instanceof Error ? error.message : String(error)}`
+        message: `接続テストに失敗しました: ${error instanceof Error ? error.message : String(error)}`,
       };
     }
   }
@@ -453,7 +483,7 @@ declare global {
   function showPerformanceReport(): void;
 }
 
-globalThis.onEdit = function(e: any): void {
+globalThis.onEdit = function (e: any): void {
   const triggerManager = TriggerManager.getInstance();
   triggerManager.onEdit(e as EditEvent).catch(error => {
     Logger.error('Unhandled error in onEdit trigger', { error });
@@ -461,20 +491,26 @@ globalThis.onEdit = function(e: any): void {
 };
 
 global.processImportManually = (rowNumber: number) => {
-  TriggerManager.getInstance().processImport(rowNumber);
+  void TriggerManager.getInstance().processImport(rowNumber);
 };
 
 global.testConnectionManually = () => {
-  TriggerManager.getInstance().testConnection().then(result => {
-    SpreadsheetApp.getUi().alert(result.message);
-  });
+  void TriggerManager.getInstance()
+    .testConnection()
+    .then(result => {
+      SpreadsheetApp.getUi().alert(result.message);
+    })
+    .catch(error => {
+      Logger.error('Test connection failed', { error });
+      SpreadsheetApp.getUi().alert('接続テストに失敗しました');
+    });
 };
 
 global.getSystemHealthReport = () => {
   const triggerManager = TriggerManager.getInstance();
   const health = triggerManager.healthCheck();
   const stats = triggerManager.getSystemStats();
-  
+
   const message = `🔍 システムヘルス状況: ${health.status.toUpperCase()}
 📊 総処理数: ${stats.totalProcessed}行
 ✅ 成功率: ${stats.overallSuccessRate.toFixed(1)}%
@@ -482,8 +518,12 @@ global.getSystemHealthReport = () => {
 🕒 最終処理: ${stats.lastProcessedAt.toLocaleString()}
 
 ${health.issues.length > 0 ? '⚠️ 課題:\n' + health.issues.map(issue => `• ${issue}`).join('\n') : '✅ システムは正常に動作しています'}`;
-  
-  SpreadsheetApp.getUi().alert('システムヘルス状況', message, SpreadsheetApp.getUi().ButtonSet.OK);
+
+  SpreadsheetApp.getUi().alert(
+    'システムヘルス状況',
+    message,
+    SpreadsheetApp.getUi().ButtonSet.OK
+  );
 };
 
 global.clearSystemErrorHistory = () => {
@@ -493,13 +533,13 @@ global.clearSystemErrorHistory = () => {
 
 global.showPerformanceReport = () => {
   const report = TriggerManager.getInstance().generatePerformanceReport(7);
-  
+
   // レポートが長い場合は、ダイアログで表示
   const ui = SpreadsheetApp.getUi();
   const htmlContent = `<div style="font-family: monospace; white-space: pre-wrap; padding: 10px;">${report.replace(/\n/g, '<br>')}</div>`;
   const htmlOutput = HtmlService.createHtmlOutput(htmlContent)
     .setWidth(600)
     .setHeight(400);
-  
+
   ui.showModalDialog(htmlOutput, 'パフォーマンスレポート (過去7日間)');
 };

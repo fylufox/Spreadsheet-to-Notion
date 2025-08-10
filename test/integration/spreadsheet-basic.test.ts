@@ -1,8 +1,23 @@
 /**
+ * Copyright 2025 Nakatani Naoya
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+/**
  * Spreadsheet Basic Integration Tests
- * 
+ *
  * スプレッドシート連携の基本的な統合テストのみを実行します。
- * 
+ *
  * @license Apache-2.0
  */
 
@@ -14,11 +29,11 @@ import sampleMappings from '../fixtures/sample-mappings.json';
 // Google Apps Script APIのモック
 const mockSpreadsheetApp = {
   getActiveSpreadsheet: jest.fn(),
-  getUi: jest.fn()
+  getUi: jest.fn(),
 };
 
 const mockPropertiesService = {
-  getScriptProperties: jest.fn()
+  getScriptProperties: jest.fn(),
 };
 
 // グローバルAPIをモック
@@ -42,7 +57,7 @@ describe('Spreadsheet Basic Integration Tests', () => {
           return sampleConfig.apiToken;
         }
         return null;
-      })
+      }),
     };
 
     mockPropertiesService.getScriptProperties.mockReturnValue(mockProperties);
@@ -56,31 +71,37 @@ describe('Spreadsheet Basic Integration Tests', () => {
               getValues: jest.fn().mockReturnValue([
                 ['DATABASE_ID', sampleConfig.notionDatabaseId],
                 ['PROJECT_NAME', 'Test Project'],
-                ['VERSION', '1.0.0']
-              ])
+                ['VERSION', '1.0.0'],
+              ]),
             }),
-            getName: jest.fn().mockReturnValue('config')
+            getName: jest.fn().mockReturnValue('config'),
           };
         }
         if (name === 'import_column') {
           return {
             getDataRange: jest.fn().mockReturnValue({
               getValues: jest.fn().mockReturnValue([
-                ['spreadsheetColumn', 'notionPropertyName', 'dataType', 'isTarget', 'isRequired'], // ヘッダー行
+                [
+                  'spreadsheetColumn',
+                  'notionPropertyName',
+                  'dataType',
+                  'isTarget',
+                  'isRequired',
+                ], // ヘッダー行
                 ...sampleMappings.map(mapping => [
                   mapping.spreadsheet_column,
                   mapping.notion_property,
                   mapping.notion_type,
                   'true',
-                  mapping.notion_property === 'Title' ? 'true' : 'false'
-                ])
-              ])
+                  mapping.notion_property === 'Title' ? 'true' : 'false',
+                ]),
+              ]),
             }),
-            getName: jest.fn().mockReturnValue('import_column')
+            getName: jest.fn().mockReturnValue('import_column'),
           };
         }
         return null;
-      })
+      }),
     };
 
     mockSpreadsheetApp.getActiveSpreadsheet.mockReturnValue(mockSpreadsheet);
@@ -131,10 +152,10 @@ describe('Spreadsheet Basic Integration Tests', () => {
     it('should handle missing configuration sheet', async () => {
       // ConfigManagerのキャッシュをクリア（重要）
       ConfigManager.clearCache();
-      
+
       // PropertiesServiceからAPIトークンも削除してエラーを確実に発生させる
       mockProperties.getProperty.mockReturnValue(null);
-      
+
       // configシートがない場合のモック
       mockSpreadsheet.getSheetByName.mockImplementation((name: string) => {
         if (name === 'config') {
@@ -144,17 +165,23 @@ describe('Spreadsheet Basic Integration Tests', () => {
           return {
             getDataRange: jest.fn().mockReturnValue({
               getValues: jest.fn().mockReturnValue([
-                ['spreadsheetColumn', 'notionPropertyName', 'dataType', 'isTarget', 'isRequired'], // ヘッダー行
+                [
+                  'spreadsheetColumn',
+                  'notionPropertyName',
+                  'dataType',
+                  'isTarget',
+                  'isRequired',
+                ], // ヘッダー行
                 ...sampleMappings.map(mapping => [
                   mapping.spreadsheet_column,
                   mapping.notion_property,
                   mapping.notion_type,
                   'true',
-                  mapping.notion_property === 'Title' ? 'true' : 'false'
-                ])
-              ])
+                  mapping.notion_property === 'Title' ? 'true' : 'false',
+                ]),
+              ]),
             }),
-            getName: jest.fn().mockReturnValue('import_column')
+            getName: jest.fn().mockReturnValue('import_column'),
           };
         }
         return null;
@@ -166,7 +193,7 @@ describe('Spreadsheet Basic Integration Tests', () => {
     it('should handle missing mapping sheet', async () => {
       // ConfigManagerのキャッシュをクリア（重要）
       ConfigManager.clearCache();
-      
+
       // import_columnシートがない場合のモック
       mockSpreadsheet.getSheetByName.mockImplementation((name: string) => {
         if (name === 'config') {
@@ -175,10 +202,10 @@ describe('Spreadsheet Basic Integration Tests', () => {
               getValues: jest.fn().mockReturnValue([
                 ['DATABASE_ID', sampleConfig.notionDatabaseId],
                 ['PROJECT_NAME', 'Test Project'],
-                ['VERSION', '1.0.0']
-              ])
+                ['VERSION', '1.0.0'],
+              ]),
             }),
-            getName: jest.fn().mockReturnValue('config')
+            getName: jest.fn().mockReturnValue('config'),
           };
         }
         if (name === 'import_column') {
@@ -193,7 +220,9 @@ describe('Spreadsheet Basic Integration Tests', () => {
         fail('Expected error to be thrown');
       } catch (error) {
         expect(error).toBeInstanceOf(Error);
-        expect((error as Error).message).toContain('Failed to load column mappings');
+        expect((error as Error).message).toContain(
+          'Failed to load column mappings'
+        );
       }
     });
   });
