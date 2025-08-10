@@ -36,3 +36,12 @@
 .ionide
 
 # End of https://www.toptal.com/developers/gitignore/api/visualstudiocode,git
+
+# Create by google/aside
+node_modules
+dist/
+build/
+.DS_Store
+.clasp*.json
+*.tgz
+.vscode/
