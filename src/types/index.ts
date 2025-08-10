@@ -260,3 +260,49 @@ export interface RequestOptions {
   payload?: string;
   muteHttpExceptions?: boolean;
 }
+
+/**
+ * TriggerManager関連の型定義
+ */
+
+/**
+ * Google Apps Script編集イベント
+ */
+export interface EditEvent {
+  range: GoogleAppsScript.Spreadsheet.Range;
+  value: any;
+  oldValue?: any;
+  source: GoogleAppsScript.Spreadsheet.Spreadsheet;
+  user: GoogleAppsScript.Base.User;
+}
+
+/**
+ * インポート処理のコンテキスト
+ */
+export interface ImportContext {
+  rowNumber: number;
+  timestamp: Date;
+  userId?: string;
+}
+
+/**
+ * インポート結果
+ */
+export interface ImportResult {
+  success: boolean;
+  result?: NotionPageResponse;
+  error?: Error;
+}
+
+/**
+ * 処理ステータス
+ */
+export interface ProcessingStatus {
+  isProcessing: boolean;
+  lastProcessTime: number;
+  errorHistory: Array<{
+    timestamp: Date;
+    error: string;
+    context?: any;
+  }>;
+}
