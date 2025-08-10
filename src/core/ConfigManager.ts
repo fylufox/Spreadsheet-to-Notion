@@ -146,6 +146,11 @@ export class ConfigManager {
       const mappingSheet = this.getSheet(CONSTANTS.SHEETS.IMPORT_COLUMN);
       const data = mappingSheet.getDataRange().getValues();
 
+      Logger.debug('Column mapping sheet data loaded', {
+        totalRows: data.length,
+        firstRowColumns: data.length > 0 ? data[0].length : 0,
+      });
+
       if (data.length <= 1) {
         throw new ConfigError(
           'Column mapping sheet is empty or contains only headers'
@@ -153,40 +158,90 @@ export class ConfigManager {
       }
 
       // ヘッダー行をスキップして処理
-      const mappings: ColumnMapping[] = data.slice(1).map((row, index) => {
-        if (row.length < 5) {
-          throw new ConfigError(
-            `Invalid column mapping at row ${index + 2}: insufficient columns`
-          );
+      const mappings: ColumnMapping[] = [];
+      const errors: string[] = [];
+
+      data.slice(1).forEach((row, index) => {
+        const rowNumber = index + 2; // 実際の行番号（ヘッダー除く）
+
+        Logger.debug(`Processing mapping row ${rowNumber}`, {
+          rowData: row,
+          columnCount: row.length,
+        });
+
+        // 空の行はスキップ
+        if (row.every(cell => !cell || String(cell).trim() === '')) {
+          Logger.debug(`Skipping empty row ${rowNumber}`);
+          return;
         }
 
-        return {
-          spreadsheetColumn: String(row[0] || ''),
-          notionPropertyName: String(row[1] || ''),
-          dataType: String(row[2] || ''),
+        // 列数の確認（最低5列必要）
+        if (row.length < 5) {
+          const error = `Row ${rowNumber}: Expected 5 columns but found ${row.length}. Row content: [${row.join(', ')}]`;
+          errors.push(error);
+          Logger.warn(`Invalid column mapping at row ${rowNumber}`, {
+            expectedColumns: 5,
+            actualColumns: row.length,
+            rowContent: row,
+          });
+          return;
+        }
+
+        // 必須フィールドの確認
+        const spreadsheetColumn = String(row[0] || '').trim();
+        const notionPropertyName = String(row[1] || '').trim();
+        const dataType = String(row[2] || '').trim();
+
+        if (!spreadsheetColumn || !notionPropertyName || !dataType) {
+          const error = `Row ${rowNumber}: Missing required fields (spreadsheetColumn: "${spreadsheetColumn}", notionPropertyName: "${notionPropertyName}", dataType: "${dataType}")`;
+          errors.push(error);
+          Logger.warn(`Incomplete column mapping at row ${rowNumber}`, {
+            spreadsheetColumn,
+            notionPropertyName,
+            dataType,
+          });
+          return;
+        }
+
+        // 有効なマッピングを追加
+        mappings.push({
+          spreadsheetColumn,
+          notionPropertyName,
+          dataType,
           isTarget: String(row[3]).toLowerCase() === 'yes',
           isRequired: String(row[4]).toLowerCase() === 'yes',
-        };
+        });
+
+        Logger.debug(`Valid mapping added for row ${rowNumber}`, {
+          spreadsheetColumn,
+          notionPropertyName,
+          dataType,
+        });
       });
 
-      // 有効なマッピングのみフィルタ
-      const validMappings = mappings.filter(
-        mapping =>
-          mapping.spreadsheetColumn &&
-          mapping.notionPropertyName &&
-          mapping.dataType
-      );
-
-      if (validMappings.length === 0) {
-        throw new ConfigError('No valid column mappings found');
+      // エラーがある場合は警告として報告（致命的ではない）
+      if (errors.length > 0) {
+        Logger.warn('Some column mapping rows were skipped due to errors', {
+          errorCount: errors.length,
+          errors: errors.slice(0, 3), // 最初の3つのエラーのみ表示
+        });
       }
 
-      Logger.info('Column mappings loaded', {
-        totalMappings: validMappings.length,
-        targetMappings: validMappings.filter(m => m.isTarget).length,
+      // 有効なマッピングが0個の場合はエラー
+      if (mappings.length === 0) {
+        throw new ConfigError(
+          `No valid column mappings found. Errors encountered: ${errors.join('; ')}`
+        );
+      }
+
+      Logger.info('Column mappings loaded successfully', {
+        totalMappings: mappings.length,
+        targetMappings: mappings.filter(m => m.isTarget).length,
+        requiredMappings: mappings.filter(m => m.isRequired).length,
+        skippedRowsCount: errors.length,
       });
 
-      return validMappings;
+      return mappings;
     } catch (error) {
       Logger.logError(error as Error, 'ConfigManager.getColumnMappings');
       throw new ConfigError('Failed to load column mappings', error as Error);

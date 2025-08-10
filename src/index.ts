@@ -362,6 +362,69 @@ function diagnoseProperties(): void {
 }
 
 /**
+ * カラムマッピングシートの詳細診断を行う関数
+ */
+function diagnoseColumnMappingSheet(): void {
+  try {
+    Logger.info('=== カラムマッピングシート診断開始 ===');
+
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const sheetName = CONSTANTS.SHEETS.IMPORT_COLUMN;
+    const sheet = spreadsheet.getSheetByName(sheetName);
+
+    if (!sheet) {
+      Logger.error(`シート "${sheetName}" が見つかりません`);
+      return;
+    }
+
+    Logger.info('シート基本情報', {
+      name: sheet.getName(),
+      lastRow: sheet.getLastRow(),
+      lastColumn: sheet.getLastColumn(),
+      maxRows: sheet.getMaxRows(),
+      maxColumns: sheet.getMaxColumns(),
+    });
+
+    // データ範囲を取得
+    const dataRange = sheet.getDataRange();
+    const data = dataRange.getValues();
+
+    Logger.info('データ範囲情報', {
+      numRows: dataRange.getNumRows(),
+      numColumns: dataRange.getNumColumns(),
+      range: dataRange.getA1Notation(),
+    });
+
+    // 各行の詳細を確認
+    data.forEach((row, index) => {
+      const rowNumber = index + 1;
+      Logger.info(`行 ${rowNumber} の詳細`, {
+        columnCount: row.length,
+        rowData: row.map(cell => String(cell).substring(0, 50)), // 50文字まで表示
+        isEmpty: row.every(cell => !cell || String(cell).trim() === ''),
+      });
+    });
+
+    // 期待される構造の説明
+    Logger.info('期待されるシート構造', {
+      requiredColumns: [
+        'A: スプレッドシート列名',
+        'B: Notionプロパティ名',
+        'C: データ型',
+        'D: 対象フラグ (yes/no)',
+        'E: 必須フラグ (yes/no)',
+      ],
+      minimumColumns: 5,
+      headerRowRequired: true,
+    });
+
+    Logger.info('=== カラムマッピングシート診断完了 ===');
+  } catch (error) {
+    Logger.error('カラムマッピングシート診断中にエラーが発生しました', error);
+  }
+}
+
+/**
  * グローバル関数の定義（Google Apps Script用）
  * スプレッドシートから直接実行可能な関数
  */
@@ -375,3 +438,4 @@ function diagnoseProperties(): void {
 (globalThis as any).testBasicFunctions = testBasicFunctions;
 (globalThis as any).setNotionApiToken = setNotionApiToken;
 (globalThis as any).diagnoseProperties = diagnoseProperties;
+(globalThis as any).diagnoseColumnMappingSheet = diagnoseColumnMappingSheet;
