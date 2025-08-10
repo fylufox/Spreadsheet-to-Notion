@@ -526,11 +526,11 @@ globalThis.onEdit = function (e: any): void {
   });
 };
 
-global.processImportManually = (rowNumber: number) => {
+(globalThis as any).processImportManually = (rowNumber: number) => {
   void TriggerManager.getInstance().processImport(rowNumber);
 };
 
-global.testConnectionManually = () => {
+(globalThis as any).testConnectionManually = () => {
   void TriggerManager.getInstance()
     .testConnection()
     .then(result => {
@@ -542,7 +542,7 @@ global.testConnectionManually = () => {
     });
 };
 
-global.getSystemHealthReport = () => {
+(globalThis as any).getSystemHealthReport = () => {
   const triggerManager = TriggerManager.getInstance();
   const health = triggerManager.healthCheck();
   const stats = triggerManager.getSystemStats();
@@ -562,12 +562,12 @@ ${health.issues.length > 0 ? '⚠️ 課題:\n' + health.issues.map(issue => `�
   );
 };
 
-global.clearSystemErrorHistory = () => {
+(globalThis as any).clearSystemErrorHistory = () => {
   TriggerManager.getInstance().clearErrorHistory();
   SpreadsheetApp.getUi().alert('エラー履歴をクリアしました');
 };
 
-global.showPerformanceReport = () => {
+(globalThis as any).showPerformanceReport = () => {
   const report = TriggerManager.getInstance().generatePerformanceReport(7);
 
   // レポートが長い場合は、ダイアログで表示
