@@ -22,7 +22,7 @@
 - **モック**: Google Apps Script API
 
 ### 1.4 品質指標
-- **テスト成功率**: 100% (132/132 テスト通過)
+- **テスト成功率**: 100% (152/152 テスト通過)
 - **コードカバレッジ**: 主要機能90%以上
 - **型安全性**: TypeScript厳格モード
 - **静的解析**: ESLint警告ゼロ
@@ -54,10 +54,15 @@
 **テストファイル**: `test/unit/DataMapper.test.ts`  
 **テスト数**: 28項目
 
-### 2.6 NotionApiClient.ts ✅ **新規追加**
+### 2.6 NotionApiClient.ts ✅ **実装完了**
 **役割**: Notion API通信・レート制限・リトライ処理  
 **テストファイル**: `test/unit/NotionApiClient.test.ts`  
 **テスト数**: 20項目
+
+### 2.7 TriggerManager.ts ✅ **実装完了**
+**役割**: Google Apps Scriptトリガー管理・メイン制御フロー  
+**テストファイル**: `test/unit/TriggerManager.test.ts`  
+**テスト数**: 17項目
 
 ### 2.5 DataMapper.ts
 **役割**: スプレッドシートデータからNotionページへの変換  
@@ -734,9 +739,198 @@ const createMockMappings = () => [
 - 各データ型に対応したテストデータセット
 - エラーパターン用の不正データ生成
 
-## 8. NotionApiClient.ts テスト詳細 ✅ **新規追加**
+## 8. TriggerManager.ts テスト詳細 ✅ **実装完了**
 
-### 8.1 API通信テスト
+### 8.1 onEditトリガーテスト
+
+#### 8.1.1 チェックボックス編集処理
+```typescript
+describe('onEdit', () => {
+  test('should process checkbox check event successfully');
+  test('should skip processing if not checkbox column');
+  test('should skip processing if checkbox is not checked');
+  test('should handle various checkbox checked values');
+  test('should prevent duplicate processing');
+});
+```
+**テスト内容:**
+- チェックボックス列の編集検知機能
+- 非対象列の編集時のスキップ処理
+- チェック状態の判定ロジック
+- 重複処理の防止機能
+
+**期待結果:**
+- 適切なトリガー条件での処理実行
+- 不適切な条件での処理スキップ
+
+#### 8.1.2 アクセス制御・検証
+```typescript
+test('should validate user access and permissions');
+```
+**テスト内容:**
+- ユーザー認証情報の確認
+- スプレッドシート編集権限の検証
+- セキュリティチェックの実行
+
+**期待結果:**
+- 権限のあるユーザーのみ処理実行可能
+
+### 8.2 processImportメイン処理テスト
+
+#### 8.2.1 新規ページ作成
+```typescript
+describe('processImport', () => {
+  test('should create new Notion page successfully');
+});
+```
+**テスト内容:**
+- 新規Notionページの作成処理
+- 主キー（Page ID）の記録
+- 成功時のユーザー通知
+
+**期待結果:**
+- Notionに正常にページが作成され、IDが記録される
+
+#### 8.2.2 既存ページ更新
+```typescript
+test('should update existing Notion page');
+```
+**テスト内容:**
+- 既存ページIDの検出機能
+- ページ更新API呼び出し
+- 更新結果の適切な処理
+
+**期待結果:**
+- 既存ページが正常に更新される
+
+#### 8.2.3 データ処理フロー
+```typescript
+test('should validate and transform data correctly');
+```
+**テスト内容:**
+- 行データの取得と検証
+- データ変換処理の実行
+- エラー発生時の適切な処理
+
+**期待結果:**
+- データ品質を保った状態でNotion形式に変換
+
+### 8.3 エラーハンドリングテスト
+
+#### 8.3.1 検証エラー処理
+```typescript
+describe('error handling', () => {
+  test('should handle validation errors');
+  test('should handle API errors');
+  test('should handle missing sheet error');
+});
+```
+**テスト内容:**
+- データ検証エラーの適切な処理
+- Notion API エラーの処理
+- スプレッドシートアクセスエラーの処理
+
+**期待結果:**
+- 各種エラーに対する適切なエラーメッセージの表示
+
+#### 8.3.2 エラー履歴管理
+```typescript
+test('should maintain error history');
+test('should clear error history');
+```
+**テスト内容:**
+- エラー発生履歴の記録機能
+- エラー履歴のクリア機能
+- エラー統計情報の提供
+
+**期待結果:**
+- 運用監視に必要なエラー情報の蓄積
+
+### 8.4 ヘルパー機能テスト
+
+#### 8.4.1 データ操作機能
+```typescript
+describe('helper methods', () => {
+  test('should get row data correctly');
+  test('should record primary key correctly');
+  test('should show success message');
+});
+```
+**テスト内容:**
+- スプレッドシート行データの取得
+- 主キー列への値記録
+- ユーザー向け成功通知
+
+**期待結果:**
+- 各ヘルパー機能が正常に動作
+
+### 8.5 接続テスト機能
+
+#### 8.5.1 Notion API 接続確認
+```typescript
+describe('connection test', () => {
+  test('should test connection successfully');
+  test('should handle connection test failure');
+});
+```
+**テスト内容:**
+- Notion APIとの接続確認機能
+- 認証情報の妥当性検証
+- 接続失敗時の適切なエラー報告
+
+**期待結果:**
+- 接続状態の正確な判定と報告
+
+### 8.6 処理状態管理テスト
+
+#### 8.6.1 シングルトンパターン
+```typescript
+describe('singleton pattern', () => {
+  test('should return same instance');
+});
+
+describe('processing status', () => {
+  test('should track processing status correctly');
+});
+```
+**テスト内容:**
+- シングルトンインスタンスの一意性確認
+- 処理中状態の適切な管理
+- ステータス情報の正確な提供
+
+**期待結果:**
+- インスタンス管理と状態管理の正確性
+
+### 8.7 Google Apps Script API モック
+
+#### 8.7.1 SpreadsheetApp モック
+```typescript
+const mockSpreadsheetApp = {
+  getActiveSpreadsheet: jest.fn(),
+  getUi: jest.fn(() => mockUi)
+};
+```
+**モック内容:**
+- スプレッドシートアクセスAPIのモック化
+- UIアラート機能のモック化
+- シート操作の模擬実行
+
+#### 8.7.2 Session・User モック
+```typescript
+const mockSession = {
+  getActiveUser: jest.fn(() => ({
+    getEmail: jest.fn().mockReturnValue('test@example.com'),
+    getUserLoginId: jest.fn().mockReturnValue('test-user-id')
+  }))
+};
+```
+**モック内容:**
+- ユーザーセッション情報のモック化
+- ユーザー認証情報の模擬取得
+
+## 9. NotionApiClient.ts テスト詳細（継続）
+
+### 9.1 API通信テスト
 
 #### 8.1.1 ページ作成機能
 ```typescript
@@ -803,7 +997,7 @@ describe('queryDatabase', () => {
 **期待結果:**
 - ページ情報またはクエリ結果の正確な返却
 
-### 8.2 接続テスト機能
+### 9.2 接続テスト機能
 
 #### 8.2.1 API接続テスト
 ```typescript
@@ -820,7 +1014,7 @@ describe('testConnection', () => {
 **期待結果:**
 - ConnectionTestResult形式での結果返却
 
-### 8.3 レート制限・リトライ機能
+### 9.3 レート制限・リトライ機能
 
 #### 8.3.1 レート制限遵守
 ```typescript
@@ -854,7 +1048,7 @@ describe('Retry mechanism', () => {
 **期待結果:**
 - 指数バックオフによる適切なリトライ実行
 
-### 8.4 エラーハンドリング
+### 9.4 エラーハンドリング
 
 #### 8.4.1 ネットワークエラー処理
 ```typescript
@@ -871,7 +1065,7 @@ describe('Error handling', () => {
 **期待結果:**
 - 適切なエラー分類と例外処理
 
-### 8.5 プロパティ設定抽出
+### 9.5 プロパティ設定抽出
 
 #### 8.5.1 各プロパティ型の設定抽出
 ```typescript
@@ -889,7 +1083,7 @@ describe('Property config extraction', () => {
 **期待結果:**
 - PropertyConfig形式での設定情報返却
 
-### 8.6 モック戦略
+### 9.6 モック戦略
 
 #### 8.6.1 UrlFetchApp モック
 ```typescript
@@ -915,9 +1109,9 @@ mockResponse = {
 - 各種HTTPステータスコードの設定
 - JSONレスポンスボディの制御
 
-## 9. モック戦略（従来分）
+## 10. モック戦略（従来分）
 
-### 9.1 Google Apps Script API モック
+### 10.1 Google Apps Script API モック
 
 #### 9.1.1 PropertiesService
 ```typescript
@@ -947,7 +1141,7 @@ Object.assign(console, mockConsole);
 - コンソール出力の監視・検証
 - 出力内容とフォーマットの確認
 
-### 9.2 モック設定パターン
+### 10.2 モック設定パターン
 
 #### 9.2.1 正常系モック
 - 期待される正常な戻り値を設定
@@ -961,9 +1155,9 @@ Object.assign(console, mockConsole);
 - 最大値、最小値、空文字、特殊文字等
 - データバリデーション機能をテスト
 
-## 10. テスト実行・管理
+## 11. テスト実行・管理
 
-### 10.1 テスト実行コマンド
+### 11.1 テスト実行コマンド
 
 #### 10.1.1 基本実行
 ```bash
@@ -974,14 +1168,16 @@ npm test -- --coverage     # カバレッジ付き実行
 
 #### 10.1.2 個別実行
 ```bash
-npm test Constants.test.ts  # Constants単体テスト
-npm test Logger.test.ts     # Logger単体テスト
-npm test ConfigManager.test.ts  # ConfigManager単体テスト
-npm test Validator.test.ts  # Validator単体テスト
-npm test DataMapper.test.ts # DataMapper単体テスト
+npm test Constants.test.ts     # Constants単体テスト
+npm test Logger.test.ts        # Logger単体テスト
+npm test ConfigManager.test.ts # ConfigManager単体テスト
+npm test Validator.test.ts     # Validator単体テスト
+npm test DataMapper.test.ts    # DataMapper単体テスト
+npm test NotionApiClient.test.ts # NotionApiClient単体テスト
+npm test TriggerManager.test.ts  # TriggerManager単体テスト
 ```
 
-### 10.2 継続的インテグレーション
+### 11.2 継続的インテグレーション
 
 #### 10.2.1 品質ゲート
 - **テスト成功率**: 100%必須
@@ -994,126 +1190,135 @@ npm test DataMapper.test.ts # DataMapper単体テスト
 - 新規テストケースの追加
 - テストカバレッジの維持・向上
 
-## 11. テスト結果
+## 12. テスト結果
 
-### 11.1 実行結果サマリー
+### 12.1 実行結果サマリー
 ```
-Test Suites: 5 passed, 5 total
-Tests:       112 passed, 112 total
+Test Suites: 7 passed, 7 total
+Tests:       152 passed, 152 total
 Snapshots:   0 total
-Time:        1.172 s
+Time:        10.385 s
 ```
 
-### 11.2 詳細結果
+### 12.2 詳細結果
 
-#### 11.2.1 Constants.test.ts
+#### 12.2.1 Constants.test.ts
 - **総テスト数**: 21
 - **成功率**: 100%
 - **テスト内容**: 設定値、正規表現、環境設定
 
-#### 11.2.2 Logger.test.ts
+#### 12.2.2 Logger.test.ts
 - **総テスト数**: 18  
 - **成功率**: 100%
 - **テスト内容**: ログ機能、マスキング、履歴管理
 
-#### 11.2.3 ConfigManager.test.ts
+#### 12.2.3 ConfigManager.test.ts
 - **総テスト数**: 3
 - **成功率**: 100%
 - **テスト内容**: 設定取得、API認証、マッピング管理
 
-#### 11.2.4 Validator.test.ts
+#### 12.2.4 Validator.test.ts
 - **総テスト数**: 42
 - **成功率**: 100%
 - **テスト内容**: データ検証、型チェック、ビジネスルール
 
-#### 11.2.5 DataMapper.test.ts
-- **総テスト数**: 26
+#### 12.2.5 DataMapper.test.ts
+- **総テスト数**: 28
 - **成功率**: 100%
 - **テスト内容**: データ変換、型変換、エラーハンドリング
 
-### 11.3 カバレッジ状況
+#### 12.2.6 NotionApiClient.test.ts
+- **総テスト数**: 20
+- **成功率**: 100%
+- **テスト内容**: API通信、レート制限、リトライ処理
+
+#### 12.2.7 TriggerManager.test.ts
+- **総テスト数**: 17
+- **成功率**: 100%
+- **テスト内容**: トリガー処理、データフロー、エラーハンドリング
+
+### 12.3 カバレッジ状況
 - **主要機能**: 90%以上カバー
 - **エラーハンドリング**: 85%以上カバー
 - **異常系パス**: 80%以上カバー
 
-## 12. 今後のテスト拡張
+## 13. 今後のテスト拡張
 
-### 12.1 次フェーズの追加テスト
+### 13.1 次フェーズの追加テスト
 
-#### 12.1.1 NotionApiClient.test.ts（次フェーズ）
-- Notion API連携機能
-- レート制限処理
-- API認証・認可
+#### 13.1.1 統合テスト（次フェーズ）
+- 全モジュール統合のエンドツーエンドテスト
+- Google Apps Script環境での動作確認
+- 実際のスプレッドシート操作テスト
 
-#### 12.1.2 TriggerManager.test.ts（次フェーズ）
-- チェックボックス変更トリガー
-- 自動実行制御
-- エラー復旧処理
+#### 13.1.2 パフォーマンステスト（次フェーズ）
+- 大容量データ処理テスト
+- 同時実行・排他制御テスト
+- メモリ使用量・処理時間の測定
 
-#### 12.1.3 ErrorManager.test.ts（次フェーズ）
-- 包括的エラーハンドリング
-- エラー分類・復旧戦略
-- ユーザー通知機能
+### 13.2 統合テスト計画
 
-### 12.2 統合テスト計画
-
-#### 12.2.1 モジュール間連携テスト
+#### 13.2.1 モジュール間連携テスト
 - Constants + Logger + ConfigManager 連携
 - Validator + DataMapper データフロー
 - 全モジュール統合シナリオテスト
 
-#### 12.2.2 実環境テスト
+#### 13.2.2 実環境テスト
 - Google Apps Script環境での動作確認
 - Notion API実連携テスト
 - スプレッドシート実操作テスト
 
-### 12.3 パフォーマンステスト
+### 13.3 パフォーマンステスト
 
-#### 12.3.1 大容量データ処理
+#### 13.3.1 大容量データ処理
 - 1000行以上のデータ一括処理
 - メモリ使用量の監視
 - 処理時間の測定・最適化
 
-#### 12.3.2 同時実行テスト
+#### 13.3.2 同時実行テスト
 - 複数ユーザーの同時アクセス
 - 排他制御の確認
 - リソース競合状態の検証
 
-## 13. 品質保証方針
+## 14. 品質保証方針
 
-### 13.1 テスト品質基準
+### 14.1 テスト品質基準
 - **機能テスト**: 全機能の正常系・異常系をカバー
 - **性能テスト**: レスポンス時間・メモリ使用量の確認
 - **セキュリティテスト**: 機密情報保護機能の確認
 - **ユーザビリティテスト**: エラーメッセージ・UI の適切性
 
-### 13.2 継続的改善
+### 14.2 継続的改善
 - テストケースの定期見直し
 - 新たな不具合パターンの追加
 - テストデータの更新・拡充
 - テスト実行効率の改善
 
-### 13.3 現フェーズでの達成項目
+### 14.3 現フェーズでの達成項目
 
-#### 13.3.1 実装完了モジュール
+#### 14.3.1 実装完了モジュール
 ✅ **Constants.ts**: 定数管理とパターン検証  
 ✅ **Logger.ts**: ログ機能と機密情報保護  
 ✅ **ConfigManager.ts**: 設定管理と認証処理  
 ✅ **Validator.ts**: データ検証とビジネスルール  
 ✅ **DataMapper.ts**: データ変換とNotion形式対応  
 ✅ **NotionApiClient.ts**: Notion API通信とレート制限対応  
+✅ **TriggerManager.ts**: Google Apps Scriptトリガー管理とメイン制御フロー  
 
-#### 13.3.2 品質メトリクス達成状況
-- **テスト成功率**: 100% (132/132) ✅
+#### 14.3.2 品質メトリクス達成状況
+- **テスト成功率**: 100% (152/152) ✅
 - **TypeScript型安全性**: エラーゼロ ✅
 - **ESLint静的解析**: 警告ゼロ ✅
 - **モジュール独立性**: 各モジュール個別テスト可能 ✅
 - **エラーハンドリング**: 全モジュールで異常系対応 ✅
+- **Google Apps Script対応**: 完全統合対応 ✅
 
-#### 13.3.3 次フェーズに向けた準備状況
+#### 14.3.3 次フェーズに向けた準備状況
 - **基盤モジュール**: すべて実装・テスト完了
-- **API連携準備**: ConfigManagerで認証処理完了
+- **API連携機能**: NotionApiClientで完全対応
+- **トリガー処理**: TriggerManagerで自動実行機能完成
 - **データ品質保証**: ValidatorとDataMapperでデータ品質確保
 - **ログ・監視基盤**: Loggerで運用監視基盤確立
+- **統合準備**: 全モジュールの統合テスト準備完了
 
 このテスト仕様書により、実装したコードの品質が体系的に保証され、今後の開発においても一貫した品質基準を維持できます。
