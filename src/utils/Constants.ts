@@ -23,6 +23,7 @@ export const CONSTANTS = {
     IMPORT_DATA: 'import_data',
     IMPORT_COLUMN: 'import_column',
     CONFIG: 'config',
+    MAPPING: 'mapping',
   },
 
   // カラム位置
@@ -57,6 +58,17 @@ export const CONSTANTS = {
     PROJECT_NAME: 'PROJECT_NAME',
     VERSION: 'VERSION',
     LAST_UPDATE: 'LAST_UPDATE',
+    NOTION_API_TOKEN: 'NOTION_API_TOKEN',
+    BATCH_SIZE: 'sync_batch_size',
+    AUTO_SYNC_ENABLED: 'auto_sync_enabled',
+    RETRY_ATTEMPTS: 'retry_attempts',
+  },
+
+  // デフォルト設定
+  DEFAULT_CONFIG: {
+    BATCH_SIZE: 10,
+    AUTO_SYNC_ENABLED: false,
+    RETRY_ATTEMPTS: 3,
   },
 
   // GAS プロパティキー

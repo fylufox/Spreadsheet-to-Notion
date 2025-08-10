@@ -22,6 +22,11 @@ export interface SystemConfig {
   projectName: string;
   version: string;
   apiToken: string;
+  batchSize?: number;
+  autoSyncEnabled?: boolean;
+  retryAttempts?: number;
+  retryDelay?: number;
+  webhookUrl?: string;
 }
 
 /**
@@ -36,10 +41,11 @@ export interface ColumnMapping {
 }
 
 /**
- * Notionページデータ
+ * Notionページデータの型定義
  */
 export interface NotionPageData {
-  properties: Record<string, NotionProperty>;
+  properties: Record<string, any>;
+  children?: any[]; // ページ内のブロック要素（オプション）
 }
 
 /**
@@ -159,8 +165,26 @@ export class ValidationError extends SpreadsheetToNotionError {
 }
 
 /**
- * API通信エラー
+ * データマッピング関連のエラー
  */
+export class MappingError extends Error {
+  public code: string;
+  public cause?: Error;
+  public context?: Record<string, any>;
+
+  constructor(message: string, cause?: Error, context?: Record<string, any>) {
+    super(message);
+    this.name = 'MappingError';
+    this.code = 'MAPPING_ERROR';
+    this.cause = cause;
+    this.context = context || {};
+    
+    // Error.captureStackTrace が利用可能な場合はスタックトレースをキャプチャ
+    if (Error.captureStackTrace) {
+      Error.captureStackTrace(this, MappingError);
+    }
+  }
+}
 export class ApiError extends SpreadsheetToNotionError {
   constructor(message: string, originalError?: Error) {
     super(message, ErrorType.API_ERROR, originalError);
