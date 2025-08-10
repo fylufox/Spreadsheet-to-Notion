@@ -1,0 +1,62 @@
+[
+  {
+    "import": true,
+    "status": "pending",
+    "title": "プロジェクト企画書作成",
+    "description": "新サービスの企画書を作成する",
+    "priority": "高",
+    "deadline": "2025-08-20",
+    "assignee": "田中太郎",
+    "tags": "企画,重要",
+    "url": "https://example.com/project1",
+    "email": "tanaka@example.com"
+  },
+  {
+    "import": false,
+    "status": "completed",
+    "title": "UI/UXデザイン",
+    "description": "ユーザーインターフェースのデザイン作成",
+    "priority": "中",
+    "deadline": "2025-08-15", 
+    "assignee": "佐藤花子",
+    "tags": "デザイン,UI",
+    "url": "https://example.com/design",
+    "email": "sato@example.com"
+  },
+  {
+    "import": true,
+    "status": "pending",
+    "title": "データベース設計",
+    "description": "システムのデータベース構造を設計",
+    "priority": "高",
+    "deadline": "2025-08-25",
+    "assignee": "鈴木一郎",
+    "tags": "技術,データベース",
+    "url": "https://example.com/database",
+    "email": "suzuki@example.com"
+  },
+  {
+    "import": true,
+    "status": "in_progress",
+    "title": "API実装",
+    "description": "RESTful APIの実装",
+    "priority": "中",
+    "deadline": "2025-09-01",
+    "assignee": "高橋美咲",
+    "tags": "技術,API",
+    "url": "https://example.com/api",
+    "email": "takahashi@example.com"
+  },
+  {
+    "import": false,
+    "status": "pending",
+    "title": "テスト計画",
+    "description": "システムテストの計画作成",
+    "priority": "低",
+    "deadline": "2025-08-30",
+    "assignee": "山田次郎",
+    "tags": "テスト,品質",
+    "url": "https://example.com/test",
+    "email": "yamada@example.com"
+  }
+]

@@ -1,0 +1,42 @@
+[
+  {
+    "spreadsheet_column": "title",
+    "notion_property": "Title",
+    "notion_type": "title"
+  },
+  {
+    "spreadsheet_column": "description", 
+    "notion_property": "Description",
+    "notion_type": "rich_text"
+  },
+  {
+    "spreadsheet_column": "priority",
+    "notion_property": "Priority", 
+    "notion_type": "select"
+  },
+  {
+    "spreadsheet_column": "deadline",
+    "notion_property": "Deadline",
+    "notion_type": "date"
+  },
+  {
+    "spreadsheet_column": "assignee",
+    "notion_property": "Assignee",
+    "notion_type": "rich_text"
+  },
+  {
+    "spreadsheet_column": "tags",
+    "notion_property": "Tags",
+    "notion_type": "multi_select"
+  },
+  {
+    "spreadsheet_column": "url",
+    "notion_property": "URL",
+    "notion_type": "url"
+  },
+  {
+    "spreadsheet_column": "email",
+    "notion_property": "Email",
+    "notion_type": "email"
+  }
+]

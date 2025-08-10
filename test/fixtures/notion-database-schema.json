@@ -1,0 +1,128 @@
+{
+  "object": "database",
+  "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "title": [
+    {
+      "type": "text",
+      "text": {
+        "content": "タスク管理データベース"
+      }
+    }
+  ],
+  "properties": {
+    "Title": {
+      "id": "title",
+      "name": "Title", 
+      "type": "title",
+      "title": {}
+    },
+    "Description": {
+      "id": "desc",
+      "name": "Description",
+      "type": "rich_text",
+      "rich_text": {}
+    },
+    "Priority": {
+      "id": "priority",
+      "name": "Priority",
+      "type": "select",
+      "select": {
+        "options": [
+          {
+            "id": "high",
+            "name": "高",
+            "color": "red"
+          },
+          {
+            "id": "medium", 
+            "name": "中",
+            "color": "yellow"
+          },
+          {
+            "id": "low",
+            "name": "低",
+            "color": "green"
+          }
+        ]
+      }
+    },
+    "Deadline": {
+      "id": "deadline",
+      "name": "Deadline",
+      "type": "date",
+      "date": {}
+    },
+    "Assignee": {
+      "id": "assignee",
+      "name": "Assignee", 
+      "type": "rich_text",
+      "rich_text": {}
+    },
+    "Tags": {
+      "id": "tags",
+      "name": "Tags",
+      "type": "multi_select",
+      "multi_select": {
+        "options": [
+          {
+            "id": "planning",
+            "name": "企画",
+            "color": "blue"
+          },
+          {
+            "id": "important",
+            "name": "重要", 
+            "color": "red"
+          },
+          {
+            "id": "design",
+            "name": "デザイン",
+            "color": "purple"
+          },
+          {
+            "id": "ui",
+            "name": "UI",
+            "color": "pink"
+          },
+          {
+            "id": "tech",
+            "name": "技術",
+            "color": "orange"
+          },
+          {
+            "id": "database",
+            "name": "データベース",
+            "color": "brown"
+          },
+          {
+            "id": "api",
+            "name": "API", 
+            "color": "yellow"
+          },
+          {
+            "id": "test",
+            "name": "テスト",
+            "color": "green"
+          },
+          {
+            "id": "quality",
+            "name": "品質",
+            "color": "gray"
+          }
+        ]
+      }
+    },
+    "URL": {
+      "id": "url",
+      "name": "URL",
+      "type": "url",
+      "url": {}
+    },
+    "Email": {
+      "id": "email", 
+      "name": "Email",
+      "type": "email",
+      "email": {}
+    }
+  }
+}

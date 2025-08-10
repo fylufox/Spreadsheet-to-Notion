@@ -1,0 +1,27 @@
+{
+  "spreadsheetId": "1A2B3C4D5E6F7G8H9I0J-SAMPLE-SPREADSHEET-ID",
+  "notionDatabaseId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "apiToken": "secret_1234567890123456789012345678901234567890123",
+  "sheetNames": {
+    "config": "config",
+    "data": "import_data",
+    "mapping": "import_column"
+  },
+  "columns": {
+    "import": "A",
+    "status": "B",
+    "title": "C",
+    "description": "D",
+    "priority": "E",
+    "deadline": "F",
+    "assignee": "G",
+    "tags": "H",
+    "url": "I",
+    "email": "J"
+  },
+  "ranges": {
+    "config": "A2:B20",
+    "mapping": "A2:C20",
+    "data": "A2:J1000"
+  }
+}
