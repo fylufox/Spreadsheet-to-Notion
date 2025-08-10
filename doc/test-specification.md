@@ -22,7 +22,7 @@
 - **モック**: Google Apps Script API
 
 ### 1.4 品質指標
-- **テスト成功率**: 100% (112/112 テスト通過)
+- **テスト成功率**: 100% (132/132 テスト通過)
 - **コードカバレッジ**: 主要機能90%以上
 - **型安全性**: TypeScript厳格モード
 - **静的解析**: ESLint警告ゼロ
@@ -48,6 +48,16 @@
 **役割**: データ検証・型チェック・ビジネスルール検証  
 **テストファイル**: `test/unit/Validator.test.ts`  
 **テスト数**: 42項目
+
+### 2.5 DataMapper.ts
+**役割**: スプレッドシート → Notion データ変換処理  
+**テストファイル**: `test/unit/DataMapper.test.ts`  
+**テスト数**: 28項目
+
+### 2.6 NotionApiClient.ts ✅ **新規追加**
+**役割**: Notion API通信・レート制限・リトライ処理  
+**テストファイル**: `test/unit/NotionApiClient.test.ts`  
+**テスト数**: 20項目
 
 ### 2.5 DataMapper.ts
 **役割**: スプレッドシートデータからNotionページへの変換  
@@ -724,6 +734,187 @@ const createMockMappings = () => [
 - 各データ型に対応したテストデータセット
 - エラーパターン用の不正データ生成
 
+## 8. NotionApiClient.ts テスト詳細 ✅ **新規追加**
+
+### 8.1 API通信テスト
+
+#### 8.1.1 ページ作成機能
+```typescript
+describe('createPage', () => {
+  test('should create a page successfully');
+  test('should handle API errors when creating a page');
+});
+```
+**テスト内容:**
+- Notion APIへのページ作成リクエスト
+- APIエラー応答の適切な処理
+- リクエストヘッダーの正確性確認
+- ペイロード形式の検証
+
+**期待結果:**
+- 正常時: NotionPageResponse形式でレスポンスを返す
+- 異常時: ApiErrorを適切にスロー
+
+#### 8.1.2 ページ更新機能
+```typescript
+describe('updatePage', () => {
+  test('should update a page successfully');
+});
+```
+**テスト内容:**
+- 既存ページの更新API呼び出し
+- PATCH メソッドの正確な使用
+- 更新データの適切な送信
+
+**期待結果:**
+- 更新されたページ情報の返却
+
+#### 8.1.3 データベース情報取得
+```typescript
+describe('getDatabaseInfo', () => {
+  test('should get database info successfully');
+  test('should handle untitled database');
+});
+```
+**テスト内容:**
+- データベースメタデータの取得
+- プロパティ設定情報の抽出
+- タイトルなしデータベースの処理
+
+**期待結果:**
+- DatabaseInfo形式でのデータベース情報返却
+
+#### 8.1.4 ページ取得・クエリ機能
+```typescript
+describe('getPage', () => {
+  test('should get page successfully');
+});
+
+describe('queryDatabase', () => {
+  test('should query database successfully');
+  test('should query database with filter and sorts');
+});
+```
+**テスト内容:**
+- 個別ページの詳細情報取得
+- データベースクエリの実行
+- フィルター・ソート条件の適用
+
+**期待結果:**
+- ページ情報またはクエリ結果の正確な返却
+
+### 8.2 接続テスト機能
+
+#### 8.2.1 API接続テスト
+```typescript
+describe('testConnection', () => {
+  test('should test connection successfully');
+  test('should handle connection test failure');
+});
+```
+**テスト内容:**
+- Notion APIとの接続確認
+- 認証情報の妥当性検証
+- 接続失敗時の適切なエラー報告
+
+**期待結果:**
+- ConnectionTestResult形式での結果返却
+
+### 8.3 レート制限・リトライ機能
+
+#### 8.3.1 レート制限遵守
+```typescript
+describe('Rate limiting', () => {
+  test('should respect rate limits');
+});
+```
+**テスト内容:**
+- 3リクエスト/秒の制限遵守
+- 連続リクエスト間の適切な待機時間
+- レート制限状態の管理
+
+**期待結果:**
+- 最小334ms間隔でのリクエスト実行
+
+#### 8.3.2 リトライ機能
+```typescript
+describe('Retry mechanism', () => {
+  test('should retry on rate limit error (429)');
+  test('should retry on server error (500)');
+  test('should not retry on client error (400)');
+  test('should stop retrying after max attempts');
+});
+```
+**テスト内容:**
+- 429（レート制限）エラー時のリトライ
+- 5xxサーバーエラー時のリトライ
+- 4xxクライアントエラー時の非リトライ
+- 最大リトライ回数での停止
+
+**期待結果:**
+- 指数バックオフによる適切なリトライ実行
+
+### 8.4 エラーハンドリング
+
+#### 8.4.1 ネットワークエラー処理
+```typescript
+describe('Error handling', () => {
+  test('should handle network errors');
+  test('should handle JSON parsing errors');
+});
+```
+**テスト内容:**
+- ネットワーク接続エラーの処理
+- JSON解析エラーの処理
+- ApiError形式での例外スロー
+
+**期待結果:**
+- 適切なエラー分類と例外処理
+
+### 8.5 プロパティ設定抽出
+
+#### 8.5.1 各プロパティ型の設定抽出
+```typescript
+describe('Property config extraction', () => {
+  test('should extract select property config');
+  test('should extract multi_select property config');
+  test('should extract number property config');
+});
+```
+**テスト内容:**
+- セレクトプロパティの選択肢抽出
+- マルチセレクトプロパティの選択肢抽出
+- 数値プロパティのフォーマット情報抽出
+
+**期待結果:**
+- PropertyConfig形式での設定情報返却
+
+### 8.6 モック戦略
+
+#### 8.6.1 UrlFetchApp モック
+```typescript
+const mockUrlFetchApp = {
+  fetch: jest.fn()
+};
+(global as any).UrlFetchApp = mockUrlFetchApp;
+```
+**モック内容:**
+- HTTP通信のモック化
+- レスポンスコード・ボディの制御
+- 異常系レスポンスの生成
+
+#### 8.6.2 HTTP レスポンス モック
+```typescript
+mockResponse = {
+  getResponseCode: jest.fn().mockReturnValue(200),
+  getContentText: jest.fn()
+};
+```
+**モック内容:**
+- Notion API レスポンスの模擬
+- 各種HTTPステータスコードの設定
+- JSONレスポンスボディの制御
+
 ## 9. モック戦略（従来分）
 
 ### 9.1 Google Apps Script API モック
@@ -910,9 +1101,10 @@ Time:        1.172 s
 ✅ **ConfigManager.ts**: 設定管理と認証処理  
 ✅ **Validator.ts**: データ検証とビジネスルール  
 ✅ **DataMapper.ts**: データ変換とNotion形式対応  
+✅ **NotionApiClient.ts**: Notion API通信とレート制限対応  
 
 #### 13.3.2 品質メトリクス達成状況
-- **テスト成功率**: 100% (112/112) ✅
+- **テスト成功率**: 100% (132/132) ✅
 - **TypeScript型安全性**: エラーゼロ ✅
 - **ESLint静的解析**: 警告ゼロ ✅
 - **モジュール独立性**: 各モジュール個別テスト可能 ✅
