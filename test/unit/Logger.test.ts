@@ -44,12 +44,14 @@ describe('Logger', () => {
     // モックをリセット
     jest.clearAllMocks();
     Logger.clearHistory();
-    
+
     // インスタンスをリセット
     (Logger as any).instance = undefined;
-    
+
     // デフォルトのプロパティサービスの動作を設定
-    mockPropertiesService.getScriptProperties().getProperty.mockReturnValue(null);
+    mockPropertiesService
+      .getScriptProperties()
+      .getProperty.mockReturnValue(null);
   });
 
   describe('ログレベル管理', () => {
@@ -68,16 +70,18 @@ describe('Logger', () => {
       // プロパティサービスからDEBUGを返すようにモック設定
       const debugPropertyMock = {
         getProperty: jest.fn(() => 'DEBUG'),
-        setProperty: jest.fn()
+        setProperty: jest.fn(),
       };
-      mockPropertiesService.getScriptProperties.mockReturnValue(debugPropertyMock);
-      
+      mockPropertiesService.getScriptProperties.mockReturnValue(
+        debugPropertyMock
+      );
+
       // 新しいインスタンス作成のため、既存インスタンスをリセット
       (Logger as any).instance = undefined;
-      
+
       const logger = Logger.getInstance();
       expect(logger.getLogLevel()).toBe(LogLevel.DEBUG);
-      
+
       // テスト後のクリーンアップ
       (Logger as any).instance = undefined;
     });
@@ -91,7 +95,7 @@ describe('Logger', () => {
     test('DEBUGログが正しく出力される', () => {
       Logger.getInstance().setLogLevel(LogLevel.DEBUG);
       Logger.debug('Debug message', { data: 'test' }, 'TestContext');
-      
+
       expect(mockConsole.log).toHaveBeenCalledWith(
         expect.stringContaining('[DEBUG]')
       );
@@ -102,7 +106,7 @@ describe('Logger', () => {
 
     test('INFOログが正しく出力される', () => {
       Logger.info('Info message', { data: 'test' });
-      
+
       expect(mockConsole.info).toHaveBeenCalledWith(
         expect.stringContaining('[INFO]')
       );
@@ -113,7 +117,7 @@ describe('Logger', () => {
 
     test('WARNログが正しく出力される', () => {
       Logger.warn('Warning message');
-      
+
       expect(mockConsole.warn).toHaveBeenCalledWith(
         expect.stringContaining('[WARN]')
       );
@@ -121,7 +125,7 @@ describe('Logger', () => {
 
     test('ERRORログが正しく出力される', () => {
       Logger.error('Error message');
-      
+
       expect(mockConsole.error).toHaveBeenCalledWith(
         expect.stringContaining('[ERROR]')
       );
@@ -132,7 +136,7 @@ describe('Logger', () => {
     test('INFOレベル設定時にDEBUGログは出力されない', () => {
       Logger.getInstance().setLogLevel(LogLevel.INFO);
       Logger.debug('Debug message');
-      
+
       expect(mockConsole.log).not.toHaveBeenCalled();
     });
 
@@ -140,7 +144,7 @@ describe('Logger', () => {
       Logger.getInstance().setLogLevel(LogLevel.ERROR);
       Logger.info('Info message');
       Logger.warn('Warning message');
-      
+
       expect(mockConsole.info).not.toHaveBeenCalled();
       expect(mockConsole.warn).not.toHaveBeenCalled();
     });
@@ -148,7 +152,7 @@ describe('Logger', () => {
     test('ERRORレベル設定時にERRORログは出力される', () => {
       Logger.getInstance().setLogLevel(LogLevel.ERROR);
       Logger.error('Error message');
-      
+
       expect(mockConsole.error).toHaveBeenCalled();
     });
   });
@@ -260,10 +264,10 @@ describe('Logger', () => {
 
     test('タイマーの開始と終了が正しく動作する', () => {
       const timerId = Logger.startTimer('test-operation');
-      
+
       // 100ms 経過をシミュレート
       jest.advanceTimersByTime(100);
-      
+
       Logger.endTimer(timerId, 'test-operation');
 
       expect(mockConsole.info).toHaveBeenCalledWith(
@@ -281,7 +285,7 @@ describe('Logger', () => {
       const errorMockPropertiesService = {
         getScriptProperties: jest.fn(() => {
           throw new Error('PropertiesService error');
-        })
+        }),
       };
 
       // 一時的にモックを置き換え
@@ -296,7 +300,6 @@ describe('Logger', () => {
           Logger.getInstance();
           Logger.info('Test message');
         }).not.toThrow();
-
       } finally {
         // モックを元に戻す
         (global as any).PropertiesService = originalPropertiesService;

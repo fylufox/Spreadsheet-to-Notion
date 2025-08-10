@@ -57,9 +57,8 @@ export class Logger {
   private getEnvironmentLogLevel(): LogLevel {
     // GAS環境では環境変数が使えないため、プロパティサービスから取得
     try {
-      const logLevel = PropertiesService.getScriptProperties().getProperty(
-        'LOG_LEVEL'
-      );
+      const logLevel =
+        PropertiesService.getScriptProperties().getProperty('LOG_LEVEL');
       if (logLevel && Object.values(LogLevel).includes(logLevel as LogLevel)) {
         return logLevel as LogLevel;
       }
@@ -144,7 +143,12 @@ export class Logger {
    * ログレベルに応じた出力判定
    */
   private shouldLog(level: LogLevel): boolean {
-    const levels = [LogLevel.DEBUG, LogLevel.INFO, LogLevel.WARN, LogLevel.ERROR];
+    const levels = [
+      LogLevel.DEBUG,
+      LogLevel.INFO,
+      LogLevel.WARN,
+      LogLevel.ERROR,
+    ];
     const currentIndex = levels.indexOf(this.currentLogLevel);
     const targetIndex = levels.indexOf(level);
     return targetIndex >= currentIndex;
@@ -164,7 +168,7 @@ export class Logger {
 
       // 配列の場合は各要素を再帰的に処理
       if (Array.isArray(data)) {
-        return data.map((item) => this.sanitizeLogData(item));
+        return data.map(item => this.sanitizeLogData(item));
       }
 
       // オブジェクトの場合は機密フィールドをマスク
@@ -200,7 +204,7 @@ export class Logger {
    */
   private isSensitiveField(fieldName: string): boolean {
     const lowerFieldName = fieldName.toLowerCase();
-    return CONSTANTS.LOGGING.SENSITIVE_FIELDS.some((sensitiveField) =>
+    return CONSTANTS.LOGGING.SENSITIVE_FIELDS.some(sensitiveField =>
       lowerFieldName.includes(sensitiveField.toLowerCase())
     );
   }
@@ -258,7 +262,9 @@ export class Logger {
 
     // 履歴サイズの制限
     if (this.logHistory.length > CONSTANTS.LOGGING.MAX_LOG_ENTRIES) {
-      this.logHistory = this.logHistory.slice(-CONSTANTS.LOGGING.MAX_LOG_ENTRIES);
+      this.logHistory = this.logHistory.slice(
+        -CONSTANTS.LOGGING.MAX_LOG_ENTRIES
+      );
     }
   }
 
@@ -268,7 +274,7 @@ export class Logger {
   public static getHistory(level?: LogLevel): LogEntry[] {
     const history = Logger.getInstance().logHistory;
     if (level) {
-      return history.filter((entry) => entry.level === level);
+      return history.filter(entry => entry.level === level);
     }
     return [...history];
   }

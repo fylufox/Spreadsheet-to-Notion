@@ -33,8 +33,12 @@ describe('Constants', () => {
     });
 
     test('カラム位置の順序が正しい', () => {
-      expect(CONSTANTS.COLUMNS.CHECKBOX).toBeLessThan(CONSTANTS.COLUMNS.PRIMARY_KEY);
-      expect(CONSTANTS.COLUMNS.PRIMARY_KEY).toBeLessThan(CONSTANTS.COLUMNS.DATA_START);
+      expect(CONSTANTS.COLUMNS.CHECKBOX).toBeLessThan(
+        CONSTANTS.COLUMNS.PRIMARY_KEY
+      );
+      expect(CONSTANTS.COLUMNS.PRIMARY_KEY).toBeLessThan(
+        CONSTANTS.COLUMNS.DATA_START
+      );
     });
   });
 
@@ -71,11 +75,11 @@ describe('Constants', () => {
   describe('PATTERNS', () => {
     test('DATABASE_ID パターンが正しく動作する', () => {
       const pattern = CONSTANTS.PATTERNS.DATABASE_ID;
-      
+
       // 正常なUUID形式
       expect('550e8400-e29b-41d4-a716-446655440000').toMatch(pattern);
       expect('550e8400e29b41d4a716446655440000').toMatch(pattern);
-      
+
       // 異常な形式
       expect('invalid-id').not.toMatch(pattern);
       expect('550e8400-e29b-41d4-a716').not.toMatch(pattern);
@@ -83,10 +87,12 @@ describe('Constants', () => {
 
     test('API_TOKEN パターンが正しく動作する', () => {
       const pattern = CONSTANTS.PATTERNS.API_TOKEN;
-      
+
       // 正常なトークン形式 (secret_ + 43文字)
-      expect('secret_abcdefghijklmnopqrstuvwxyz1234567890123abcd').toMatch(pattern);
-      
+      expect('secret_abcdefghijklmnopqrstuvwxyz1234567890123abcd').toMatch(
+        pattern
+      );
+
       // 異常な形式
       expect('invalid_token').not.toMatch(pattern);
       expect('secret_short').not.toMatch(pattern);
@@ -95,11 +101,11 @@ describe('Constants', () => {
 
     test('EMAIL パターンが正しく動作する', () => {
       const pattern = CONSTANTS.PATTERNS.EMAIL;
-      
+
       // 正常なメール形式
       expect('test@example.com').toMatch(pattern);
       expect('user.name+tag@domain.co.jp').toMatch(pattern);
-      
+
       // 異常な形式
       expect('invalid-email').not.toMatch(pattern);
       expect('@domain.com').not.toMatch(pattern);
@@ -108,11 +114,11 @@ describe('Constants', () => {
 
     test('URL パターンが正しく動作する', () => {
       const pattern = CONSTANTS.PATTERNS.URL;
-      
+
       // 正常なURL形式
       expect('https://example.com').toMatch(pattern);
       expect('http://localhost:3000/path').toMatch(pattern);
-      
+
       // 異常な形式
       expect('ftp://example.com').not.toMatch(pattern);
       expect('invalid-url').not.toMatch(pattern);
@@ -123,13 +129,17 @@ describe('Constants', () => {
     test('成功メッセージが定義されている', () => {
       expect(typeof CONSTANTS.MESSAGES.SUCCESS.IMPORT_COMPLETE).toBe('string');
       expect(typeof CONSTANTS.MESSAGES.SUCCESS.CONFIG_SAVED).toBe('string');
-      expect(typeof CONSTANTS.MESSAGES.SUCCESS.VALIDATION_PASSED).toBe('string');
+      expect(typeof CONSTANTS.MESSAGES.SUCCESS.VALIDATION_PASSED).toBe(
+        'string'
+      );
     });
 
     test('エラーメッセージが定義されている', () => {
       expect(typeof CONSTANTS.MESSAGES.ERROR.CONFIG_MISSING).toBe('string');
       expect(typeof CONSTANTS.MESSAGES.ERROR.INVALID_DATA).toBe('string');
-      expect(typeof CONSTANTS.MESSAGES.ERROR.API_CONNECTION_FAILED).toBe('string');
+      expect(typeof CONSTANTS.MESSAGES.ERROR.API_CONNECTION_FAILED).toBe(
+        'string'
+      );
     });
 
     test('警告メッセージが定義されている', () => {
@@ -141,10 +151,18 @@ describe('Constants', () => {
   describe('DATA_TYPES', () => {
     test('Notionでサポートされるデータ型が定義されている', () => {
       const expectedTypes = [
-        'title', 'rich_text', 'number', 'select', 'multi_select',
-        'date', 'checkbox', 'url', 'email', 'phone_number'
+        'title',
+        'rich_text',
+        'number',
+        'select',
+        'multi_select',
+        'date',
+        'checkbox',
+        'url',
+        'email',
+        'phone_number',
       ];
-      
+
       expectedTypes.forEach(type => {
         expect(Object.values(CONSTANTS.DATA_TYPES)).toContain(type);
       });
@@ -169,7 +187,9 @@ describe('Constants', () => {
       expect(CONSTANTS.DEFAULTS.VERSION).toMatch(/^\d+\.\d+\.\d+$/);
       expect(typeof CONSTANTS.DEFAULTS.PROJECT_NAME).toBe('string');
       expect(CONSTANTS.DEFAULTS.CACHE_DURATION).toBeGreaterThan(0);
-      expect(['DEBUG', 'INFO', 'WARN', 'ERROR']).toContain(CONSTANTS.DEFAULTS.LOG_LEVEL);
+      expect(['DEBUG', 'INFO', 'WARN', 'ERROR']).toContain(
+        CONSTANTS.DEFAULTS.LOG_LEVEL
+      );
     });
 
     test('キャッシュ期間が適切な値である', () => {
@@ -198,7 +218,9 @@ describe('Constants', () => {
 describe('ENV_CONFIG', () => {
   test('開発環境設定が定義されている', () => {
     expect(ENV_CONFIG.DEVELOPMENT.LOG_LEVEL).toBe('DEBUG');
-    expect(ENV_CONFIG.DEVELOPMENT.API_TIMEOUT).toBeGreaterThan(CONSTANTS.NOTION.TIMEOUT);
+    expect(ENV_CONFIG.DEVELOPMENT.API_TIMEOUT).toBeGreaterThan(
+      CONSTANTS.NOTION.TIMEOUT
+    );
     expect(ENV_CONFIG.DEVELOPMENT.ENABLE_CACHE).toBe(false);
   });
 
@@ -211,9 +233,11 @@ describe('ENV_CONFIG', () => {
   test('環境別の設定が適切に分かれている', () => {
     // 開発環境はより詳細なログ、長いタイムアウト、キャッシュ無効
     expect(ENV_CONFIG.DEVELOPMENT.LOG_LEVEL).toBe('DEBUG');
-    expect(ENV_CONFIG.DEVELOPMENT.API_TIMEOUT).toBeGreaterThan(ENV_CONFIG.PRODUCTION.API_TIMEOUT);
+    expect(ENV_CONFIG.DEVELOPMENT.API_TIMEOUT).toBeGreaterThan(
+      ENV_CONFIG.PRODUCTION.API_TIMEOUT
+    );
     expect(ENV_CONFIG.DEVELOPMENT.ENABLE_CACHE).toBe(false);
-    
+
     // 本番環境は効率的な設定
     expect(ENV_CONFIG.PRODUCTION.LOG_LEVEL).toBe('INFO');
     expect(ENV_CONFIG.PRODUCTION.ENABLE_CACHE).toBe(true);

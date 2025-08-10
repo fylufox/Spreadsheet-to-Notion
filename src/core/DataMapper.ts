@@ -25,26 +25,28 @@ import { Validator } from './Validator';
  * Notion APIに送信可能な形式に整形する
  */
 export class DataMapper {
-
   /**
    * スプレッドシートの行データをNotionページデータに変換
    */
   public static mapRowToNotionPage(
     rowData: any[],
     columnMappings: ColumnMapping[],
-    rowIndex: number = 0
+    rowIndex = 0
   ): NotionPageData {
     const timerId = Logger.startTimer('DataMapper.mapRowToNotionPage');
-    
+
     try {
       Logger.debug('Starting row data mapping', {
         rowIndex,
         dataLength: rowData.length,
-        mappingsCount: columnMappings.length
+        mappingsCount: columnMappings.length,
       });
 
       // データ検証
-      const validationResult = Validator.validateRowData(rowData, columnMappings);
+      const validationResult = Validator.validateRowData(
+        rowData,
+        columnMappings
+      );
       if (!validationResult.valid) {
         throw new MappingError(
           `Row ${rowIndex + 1} validation failed: ${validationResult.errors.join(', ')}`,
@@ -55,51 +57,66 @@ export class DataMapper {
 
       // 対象となるマッピングのみを処理
       const targetMappings = columnMappings.filter(mapping => mapping.isTarget);
-      
+
       if (targetMappings.length === 0) {
-        throw new MappingError('No target column mappings found', undefined, { rowIndex });
+        throw new MappingError('No target column mappings found', undefined, {
+          rowIndex,
+        });
       }
 
       // Notionページデータの初期化
       const pageData: NotionPageData = {
         properties: {},
-        children: []
+        children: [],
       };
 
       // 各カラムをマッピング
       for (const mapping of targetMappings) {
-        const columnIndex = this.getColumnIndex(mapping.spreadsheetColumn, rowData);
-        
+        const columnIndex = this.getColumnIndex(
+          mapping.spreadsheetColumn,
+          rowData
+        );
+
         if (columnIndex === -1) {
-          Logger.warn(`Column '${mapping.spreadsheetColumn}' not found in row data`, { rowIndex });
+          Logger.warn(
+            `Column '${mapping.spreadsheetColumn}' not found in row data`,
+            { rowIndex }
+          );
           continue;
         }
 
         const cellValue = rowData[columnIndex];
-        
+
         // 空値のスキップ（必須でない場合）
         if (!mapping.isRequired && this.isEmpty(cellValue)) {
-          Logger.debug(`Skipping empty non-required field: ${mapping.notionPropertyName}`);
+          Logger.debug(
+            `Skipping empty non-required field: ${mapping.notionPropertyName}`
+          );
           continue;
         }
 
         try {
-          const notionProperty = this.convertToNotionProperty(cellValue, mapping);
+          const notionProperty = this.convertToNotionProperty(
+            cellValue,
+            mapping
+          );
           pageData.properties[mapping.notionPropertyName] = notionProperty;
-          
-          Logger.debug(`Mapped field: ${mapping.spreadsheetColumn} -> ${mapping.notionPropertyName}`, {
-            dataType: mapping.dataType,
-            originalValue: this.sanitizeForLog(cellValue),
-            mappedValue: this.sanitizeForLog(notionProperty)
-          });
-          
+
+          Logger.debug(
+            `Mapped field: ${mapping.spreadsheetColumn} -> ${mapping.notionPropertyName}`,
+            {
+              dataType: mapping.dataType,
+              originalValue: this.sanitizeForLog(cellValue),
+              mappedValue: this.sanitizeForLog(notionProperty),
+            }
+          );
         } catch (error) {
           Logger.warn(`Failed to map field '${mapping.notionPropertyName}'`, {
             error: (error as Error).message,
             value: this.sanitizeForLog(cellValue),
-            mapping
+            mapping,
           });
-          
+
           // 必須フィールドの場合はエラーとする
           if (mapping.isRequired) {
             throw new MappingError(
@@ -115,7 +132,7 @@ export class DataMapper {
       const hasTitle = Object.values(pageData.properties).some(
         (prop: any) => prop.type === 'title'
       );
-      
+
       if (!hasTitle) {
         throw new MappingError(
           'No title property found in mapped data',
@@ -126,21 +143,21 @@ export class DataMapper {
 
       Logger.debug('Row data mapping completed', {
         rowIndex,
-        propertiesCount: Object.keys(pageData.properties).length
+        propertiesCount: Object.keys(pageData.properties).length,
       });
 
       Logger.endTimer(timerId, 'DataMapper.mapRowToNotionPage');
       return pageData;
-
     } catch (error) {
       Logger.endTimer(timerId, 'DataMapper.mapRowToNotionPage (error)');
-      
+
       if (error instanceof MappingError) {
         Logger.logError(error, 'DataMapper.mapRowToNotionPage');
         throw error;
       }
-      
-      const errorInstance = error instanceof Error ? error : new Error(String(error));
+
+      const errorInstance =
+        error instanceof Error ? error : new Error(String(error));
       Logger.logError(errorInstance, 'DataMapper.mapRowToNotionPage');
       throw new MappingError(
         `Unexpected error mapping row ${rowIndex + 1}: ${errorInstance.message}`,
@@ -156,7 +173,7 @@ export class DataMapper {
   public static mapRowsToNotionPages(
     rowsData: any[][],
     columnMappings: ColumnMapping[],
-    startRowIndex: number = 0
+    startRowIndex = 0
   ): NotionPageData[] {
     const timerId = Logger.startTimer('DataMapper.mapRowsToNotionPages');
     const results: NotionPageData[] = [];
@@ -165,12 +182,12 @@ export class DataMapper {
     try {
       Logger.info(`Starting batch mapping of ${rowsData.length} rows`, {
         startRowIndex,
-        mappingsCount: columnMappings.length
+        mappingsCount: columnMappings.length,
       });
 
       for (let i = 0; i < rowsData.length; i++) {
         const globalRowIndex = startRowIndex + i;
-        
+
         try {
           const pageData = this.mapRowToNotionPage(
             rowsData[i],
@@ -178,15 +195,14 @@ export class DataMapper {
             globalRowIndex
           );
           results.push(pageData);
-          
         } catch (error) {
-          errors.push({ 
-            rowIndex: globalRowIndex, 
-            error: error as Error 
+          errors.push({
+            rowIndex: globalRowIndex,
+            error: error as Error,
           });
-          
+
           Logger.warn(`Failed to map row ${globalRowIndex + 1}`, {
-            error: (error as Error).message
+            error: (error as Error).message,
           });
         }
       }
@@ -194,7 +210,7 @@ export class DataMapper {
       Logger.info(`Batch mapping completed`, {
         totalRows: rowsData.length,
         successCount: results.length,
-        errorCount: errors.length
+        errorCount: errors.length,
       });
 
       // エラーがある場合は詳細をログ出力
@@ -202,22 +218,26 @@ export class DataMapper {
         Logger.warn('Mapping errors occurred', {
           errorSummary: errors.map(e => ({
             row: e.rowIndex + 1,
-            message: e.error.message
-          }))
+            message: e.error.message,
+          })),
         });
       }
 
       Logger.endTimer(timerId, 'DataMapper.mapRowsToNotionPages');
       return results;
-
     } catch (error) {
       Logger.endTimer(timerId, 'DataMapper.mapRowsToNotionPages (error)');
-      const errorInstance = error instanceof Error ? error : new Error(String(error));
+      const errorInstance =
+        error instanceof Error ? error : new Error(String(error));
       Logger.logError(errorInstance, 'DataMapper.mapRowsToNotionPages');
       throw new MappingError(
         `Batch mapping failed: ${errorInstance.message}`,
         errorInstance,
-        { startRowIndex, rowCount: rowsData.length, partialResults: results.length }
+        {
+          startRowIndex,
+          rowCount: rowsData.length,
+          partialResults: results.length,
+        }
       );
     }
   }
@@ -225,7 +245,10 @@ export class DataMapper {
   /**
    * セル値をNotionプロパティ形式に変換
    */
-  private static convertToNotionProperty(value: any, mapping: ColumnMapping): any {
+  private static convertToNotionProperty(
+    value: any,
+    mapping: ColumnMapping
+  ): any {
     if (this.isEmpty(value)) {
       return this.createEmptyNotionProperty(mapping.dataType);
     }
@@ -277,10 +300,10 @@ export class DataMapper {
         {
           type: 'text',
           text: {
-            content: textValue.substring(0, 2000) // Notion制限に合わせて切り詰め
-          }
-        }
-      ]
+            content: textValue.substring(0, 2000), // Notion制限に合わせて切り詰め
+          },
+        },
+      ],
     };
   }
 
@@ -295,10 +318,10 @@ export class DataMapper {
         {
           type: 'text',
           text: {
-            content: textValue.substring(0, 2000)
-          }
-        }
-      ]
+            content: textValue.substring(0, 2000),
+          },
+        },
+      ],
     };
   }
 
@@ -307,14 +330,14 @@ export class DataMapper {
    */
   private static convertToNumber(value: any): any {
     const numValue = Number(value);
-    
+
     if (isNaN(numValue) || !isFinite(numValue)) {
       throw new Error(`Invalid number value: ${value}`);
     }
-    
+
     return {
       type: 'number',
-      number: numValue
+      number: numValue,
     };
   }
 
@@ -342,8 +365,8 @@ export class DataMapper {
     return {
       type: 'date',
       date: {
-        start: dateValue.toISOString().split('T')[0] // YYYY-MM-DD形式
-      }
+        start: dateValue.toISOString().split('T')[0], // YYYY-MM-DD形式
+      },
     };
   }
 
@@ -381,7 +404,7 @@ export class DataMapper {
 
     return {
       type: 'checkbox',
-      checkbox: boolValue
+      checkbox: boolValue,
     };
   }
 
@@ -390,11 +413,11 @@ export class DataMapper {
    */
   private static convertToSelect(value: any): any {
     const selectValue = String(value).trim();
-    
+
     if (selectValue.length === 0) {
       throw new Error('Select option cannot be empty');
     }
-    
+
     if (selectValue.length > 100) {
       throw new Error('Select option exceeds maximum length');
     }
@@ -402,8 +425,8 @@ export class DataMapper {
     return {
       type: 'select',
       select: {
-        name: selectValue
-      }
+        name: selectValue,
+      },
     };
   }
 
@@ -412,11 +435,11 @@ export class DataMapper {
    */
   private static convertToMultiSelect(value: any): any {
     const stringValue = String(value).trim();
-    
+
     if (stringValue.length === 0) {
       return {
         type: 'multi_select',
-        multi_select: []
+        multi_select: [],
       };
     }
 
@@ -427,12 +450,12 @@ export class DataMapper {
       .filter(option => option.length > 0)
       .slice(0, 100) // Notionの制限
       .map(option => ({
-        name: option.substring(0, 100) // 各オプションの長さ制限
+        name: option.substring(0, 100), // 各オプションの長さ制限
       }));
 
     return {
       type: 'multi_select',
-      multi_select: options
+      multi_select: options,
     };
   }
 
@@ -441,14 +464,14 @@ export class DataMapper {
    */
   private static convertToUrl(value: any): any {
     const urlValue = String(value).trim();
-    
+
     if (!CONSTANTS.PATTERNS.URL.test(urlValue)) {
       throw new Error(`Invalid URL format: ${value}`);
     }
 
     return {
       type: 'url',
-      url: urlValue.substring(0, 2000)
+      url: urlValue.substring(0, 2000),
     };
   }
 
@@ -457,14 +480,14 @@ export class DataMapper {
    */
   private static convertToEmail(value: any): any {
     const emailValue = String(value).trim();
-    
+
     if (!CONSTANTS.PATTERNS.EMAIL.test(emailValue)) {
       throw new Error(`Invalid email format: ${value}`);
     }
 
     return {
       type: 'email',
-      email: emailValue.substring(0, 320)
+      email: emailValue.substring(0, 320),
     };
   }
 
@@ -473,14 +496,14 @@ export class DataMapper {
    */
   private static convertToPhoneNumber(value: any): any {
     const phoneValue = String(value).trim();
-    
+
     if (!CONSTANTS.PATTERNS.PHONE.test(phoneValue)) {
       throw new Error(`Invalid phone number format: ${value}`);
     }
 
     return {
       type: 'phone_number',
-      phone_number: phoneValue.substring(0, 50)
+      phone_number: phoneValue.substring(0, 50),
     };
   }
 
@@ -523,7 +546,7 @@ export class DataMapper {
     if (!isNaN(index) && index >= 0 && index < rowData.length) {
       return index;
     }
-    
+
     // アルファベットカラム名（A, B, C...）を数値に変換
     if (/^[A-Z]+$/i.test(columnName)) {
       let result = 0;
@@ -536,7 +559,7 @@ export class DataMapper {
         return zeroBasedIndex;
       }
     }
-    
+
     return -1;
   }
 
@@ -544,10 +567,12 @@ export class DataMapper {
    * 値が空かどうかを判定
    */
   private static isEmpty(value: any): boolean {
-    return value === null || 
-           value === undefined || 
-           (typeof value === 'string' && value.trim() === '') ||
-           (typeof value === 'number' && isNaN(value));
+    return (
+      value === null ||
+      value === undefined ||
+      (typeof value === 'string' && value.trim() === '') ||
+      (typeof value === 'number' && isNaN(value))
+    );
   }
 
   /**
@@ -563,9 +588,7 @@ export class DataMapper {
   /**
    * マッピング統計情報を取得
    */
-  public static getMappingStats(
-    columnMappings: ColumnMapping[]
-  ): {
+  public static getMappingStats(columnMappings: ColumnMapping[]): {
     totalMappings: number;
     targetMappings: number;
     requiredMappings: number;
@@ -573,17 +596,18 @@ export class DataMapper {
   } {
     const targetMappings = columnMappings.filter(m => m.isTarget);
     const requiredMappings = targetMappings.filter(m => m.isRequired);
-    
+
     const dataTypeBreakdown: Record<string, number> = {};
     targetMappings.forEach(mapping => {
-      dataTypeBreakdown[mapping.dataType] = (dataTypeBreakdown[mapping.dataType] || 0) + 1;
+      dataTypeBreakdown[mapping.dataType] =
+        (dataTypeBreakdown[mapping.dataType] || 0) + 1;
     });
 
     return {
       totalMappings: columnMappings.length,
       targetMappings: targetMappings.length,
       requiredMappings: requiredMappings.length,
-      dataTypeBreakdown
+      dataTypeBreakdown,
     };
   }
 
@@ -600,35 +624,42 @@ export class DataMapper {
   } {
     const issues: string[] = [];
     const warnings: string[] = [];
-    
+
     const targetMappings = columnMappings.filter(m => m.isTarget);
-    
+
     for (const mapping of targetMappings) {
-      const columnIndex = this.getColumnIndex(mapping.spreadsheetColumn, rowData);
-      
+      const columnIndex = this.getColumnIndex(
+        mapping.spreadsheetColumn,
+        rowData
+      );
+
       if (columnIndex === -1) {
         issues.push(`Column '${mapping.spreadsheetColumn}' not found`);
         continue;
       }
-      
+
       const value = rowData[columnIndex];
-      
+
       if (this.isEmpty(value)) {
         if (mapping.isRequired) {
-          issues.push(`Required field '${mapping.notionPropertyName}' is empty`);
+          issues.push(
+            `Required field '${mapping.notionPropertyName}' is empty`
+          );
         }
         continue;
       }
-      
+
       if (!Validator.canConvertToNotionType(value, mapping.dataType)) {
-        issues.push(`Value '${value}' cannot be converted to ${mapping.dataType}`);
+        issues.push(
+          `Value '${value}' cannot be converted to ${mapping.dataType}`
+        );
       }
     }
-    
+
     return {
       compatible: issues.length === 0,
       issues,
-      warnings
+      warnings,
     };
   }
 }

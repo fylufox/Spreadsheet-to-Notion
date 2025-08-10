@@ -32,7 +32,6 @@ function onEdit(e: GoogleAppsScript.Events.SheetsOnEdit): void {
 
     // TODO: TriggerManager実装後に置き換え
     // TriggerManager.onEdit(e);
-    
   } catch (error) {
     Logger.error('onEdit failed', error);
     // TODO: ErrorManager実装後に置き換え
@@ -46,15 +45,14 @@ function onEdit(e: GoogleAppsScript.Events.SheetsOnEdit): void {
 function initializeSystem(): void {
   try {
     Logger.info('System initialization started');
-    
+
     // システム情報をログ出力
     Logger.info('System constants loaded', {
       version: CONSTANTS.DEFAULTS.VERSION,
       sheets: CONSTANTS.SHEETS,
     });
-    
+
     Logger.info('System initialization completed');
-    
   } catch (error) {
     Logger.error('System initialization failed', error);
   }
@@ -66,27 +64,26 @@ function initializeSystem(): void {
 function testBasicFunctions(): void {
   try {
     Logger.info('Running basic function tests');
-    
+
     // Constants の動作確認
     Logger.debug('Testing constants', {
       sheetsCount: Object.keys(CONSTANTS.SHEETS).length,
       dataTypesCount: Object.keys(CONSTANTS.DATA_TYPES).length,
     });
-    
+
     // Logger の各レベルをテスト
     Logger.debug('Debug test message');
     Logger.info('Info test message');
     Logger.warn('Warning test message');
     Logger.error('Error test message');
-    
+
     // 機密情報マスキングのテスト
     Logger.info('Testing sensitive data masking', {
       apiToken: 'secret_abcdefghijklmnopqrstuvwxyz1234567890123',
       normalData: 'This is normal data',
     });
-    
+
     Logger.info('Basic function tests completed');
-    
   } catch (error) {
     Logger.error('Basic function tests failed', error);
   }

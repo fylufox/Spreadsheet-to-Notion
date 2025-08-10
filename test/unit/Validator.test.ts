@@ -25,12 +25,11 @@ jest.mock('../../src/utils/Logger', () => ({
     warn: jest.fn(),
     logError: jest.fn(),
     startTimer: jest.fn(() => 'timer-1'),
-    endTimer: jest.fn()
-  }
+    endTimer: jest.fn(),
+  },
 }));
 
 describe('Validator', () => {
-  
   describe('validateRowData', () => {
     const validColumnMappings: ColumnMapping[] = [
       {
@@ -38,28 +37,28 @@ describe('Validator', () => {
         notionPropertyName: 'Title',
         dataType: CONSTANTS.DATA_TYPES.TITLE,
         isRequired: true,
-        isTarget: true
+        isTarget: true,
       },
       {
         spreadsheetColumn: '1',
         notionPropertyName: 'Description',
         dataType: CONSTANTS.DATA_TYPES.RICH_TEXT,
         isRequired: false,
-        isTarget: true
+        isTarget: true,
       },
       {
         spreadsheetColumn: '2',
         notionPropertyName: 'Count',
         dataType: CONSTANTS.DATA_TYPES.NUMBER,
         isRequired: false,
-        isTarget: true
-      }
+        isTarget: true,
+      },
     ];
 
     test('正常なデータを検証できる', () => {
       const rowData = ['Test Title', 'Test Description', 100];
       const result = Validator.validateRowData(rowData, validColumnMappings);
-      
+
       expect(result.valid).toBe(true);
       expect(result.errors).toEqual([]);
     });
@@ -67,7 +66,7 @@ describe('Validator', () => {
     test('配列以外のデータでエラーになる', () => {
       const rowData = 'not an array' as any;
       const result = Validator.validateRowData(rowData, validColumnMappings);
-      
+
       expect(result.valid).toBe(false);
       expect(result.errors).toContain('Row data must be an array');
     });
@@ -75,16 +74,21 @@ describe('Validator', () => {
     test('データが短すぎる場合エラーになる', () => {
       const rowData = ['Title'];
       const result = Validator.validateRowData(rowData, validColumnMappings);
-      
+
       expect(result.valid).toBe(false);
-      expect(result.errors).toContain(`Row data must have at least ${CONSTANTS.COLUMNS.DATA_START} columns`);
+      expect(result.errors).toContain(
+        `Row data must have at least ${CONSTANTS.COLUMNS.DATA_START} columns`
+      );
     });
 
     test('対象マッピングがない場合エラーになる', () => {
-      const noTargetMappings = validColumnMappings.map(m => ({ ...m, isTarget: false }));
+      const noTargetMappings = validColumnMappings.map(m => ({
+        ...m,
+        isTarget: false,
+      }));
       const rowData = ['Test Title', 'Test Description', 100];
       const result = Validator.validateRowData(rowData, noTargetMappings);
-      
+
       expect(result.valid).toBe(false);
       expect(result.errors).toContain('No target column mappings found');
     });
@@ -92,7 +96,7 @@ describe('Validator', () => {
     test('必須フィールドが空の場合エラーになる', () => {
       const rowData = ['', 'Test Description', 100];
       const result = Validator.validateRowData(rowData, validColumnMappings);
-      
+
       expect(result.valid).toBe(false);
       expect(result.errors).toContain("Required field '0 (Title)' is empty");
     });
@@ -104,15 +108,17 @@ describe('Validator', () => {
           notionPropertyName: 'Number',
           dataType: CONSTANTS.DATA_TYPES.NUMBER,
           isRequired: false,
-          isTarget: true
-        }
+          isTarget: true,
+        },
       ];
-      
+
       const rowData = ['invalid number', '', ''];
       const result = Validator.validateRowData(rowData, mappingsWithNumber);
-      
+
       expect(result.valid).toBe(false);
-      expect(result.errors).toContain("Field '0 (Number)' must be a valid number, got 'invalid number'");
+      expect(result.errors).toContain(
+        "Field '0 (Number)' must be a valid number, got 'invalid number'"
+      );
     });
   });
 
@@ -123,9 +129,9 @@ describe('Validator', () => {
         notionPropertyName: 'Title',
         dataType: CONSTANTS.DATA_TYPES.TITLE,
         isRequired: true,
-        isTarget: true
+        isTarget: true,
       };
-      
+
       const result = Validator.validateMapping(mapping);
       expect(result.valid).toBe(true);
       expect(result.errors).toEqual([]);
@@ -137,9 +143,9 @@ describe('Validator', () => {
         notionPropertyName: 'Title',
         dataType: CONSTANTS.DATA_TYPES.TITLE,
         isRequired: true,
-        isTarget: true
+        isTarget: true,
       };
-      
+
       const result = Validator.validateMapping(mapping);
       expect(result.valid).toBe(false);
       expect(result.errors).toContain('Spreadsheet column name is required');
@@ -151,9 +157,9 @@ describe('Validator', () => {
         notionPropertyName: '',
         dataType: CONSTANTS.DATA_TYPES.TITLE,
         isRequired: true,
-        isTarget: true
+        isTarget: true,
       };
-      
+
       const result = Validator.validateMapping(mapping);
       expect(result.valid).toBe(false);
       expect(result.errors).toContain('Notion property name is required');
@@ -165,9 +171,9 @@ describe('Validator', () => {
         notionPropertyName: 'Title',
         dataType: '',
         isRequired: true,
-        isTarget: true
+        isTarget: true,
       };
-      
+
       const result = Validator.validateMapping(mapping);
       expect(result.valid).toBe(false);
       expect(result.errors).toContain('Data type is required');
@@ -179,9 +185,9 @@ describe('Validator', () => {
         notionPropertyName: 'Title',
         dataType: 'invalid_type',
         isRequired: true,
-        isTarget: true
+        isTarget: true,
       };
-      
+
       const result = Validator.validateMapping(mapping);
       expect(result.valid).toBe(false);
       expect(result.errors).toContain("Invalid data type 'invalid_type'");
@@ -193,9 +199,9 @@ describe('Validator', () => {
         notionPropertyName: 'id',
         dataType: CONSTANTS.DATA_TYPES.TITLE,
         isRequired: true,
-        isTarget: true
+        isTarget: true,
       };
-      
+
       const result = Validator.validateMapping(mapping);
       expect(result.valid).toBe(false);
       expect(result.errors).toContain("'id' is a reserved property name");
@@ -207,12 +213,14 @@ describe('Validator', () => {
         notionPropertyName: 'a'.repeat(101),
         dataType: CONSTANTS.DATA_TYPES.TITLE,
         isRequired: true,
-        isTarget: true
+        isTarget: true,
       };
-      
+
       const result = Validator.validateMapping(mapping);
       expect(result.valid).toBe(false);
-      expect(result.errors).toContain('Notion property name exceeds maximum length of 100 characters');
+      expect(result.errors).toContain(
+        'Notion property name exceeds maximum length of 100 characters'
+      );
     });
   });
 
@@ -223,15 +231,15 @@ describe('Validator', () => {
         notionPropertyName: 'Title',
         dataType: CONSTANTS.DATA_TYPES.TITLE,
         isRequired: true,
-        isTarget: true
+        isTarget: true,
       },
       {
         spreadsheetColumn: 'B',
         notionPropertyName: 'Description',
         dataType: CONSTANTS.DATA_TYPES.RICH_TEXT,
         isRequired: false,
-        isTarget: true
-      }
+        isTarget: true,
+      },
     ];
 
     test('正常なマッピング配列を検証できる', () => {
@@ -260,10 +268,10 @@ describe('Validator', () => {
           notionPropertyName: 'Another',
           dataType: CONSTANTS.DATA_TYPES.RICH_TEXT,
           isRequired: false,
-          isTarget: true
-        }
+          isTarget: true,
+        },
       ];
-      
+
       const result = Validator.validateMappings(duplicateMappings);
       expect(result.valid).toBe(false);
       expect(result.errors).toContain('Duplicate spreadsheet columns: A');
@@ -277,10 +285,10 @@ describe('Validator', () => {
           notionPropertyName: 'Title',
           dataType: CONSTANTS.DATA_TYPES.RICH_TEXT,
           isRequired: false,
-          isTarget: true
-        }
+          isTarget: true,
+        },
       ];
-      
+
       const result = Validator.validateMappings(duplicateMappings);
       expect(result.valid).toBe(false);
       expect(result.errors).toContain('Duplicate Notion properties: Title');
@@ -289,12 +297,14 @@ describe('Validator', () => {
     test('タイトル型マッピングがない場合エラーになる', () => {
       const noTitleMappings = validMappings.map(m => ({
         ...m,
-        dataType: CONSTANTS.DATA_TYPES.RICH_TEXT
+        dataType: CONSTANTS.DATA_TYPES.RICH_TEXT,
       }));
-      
+
       const result = Validator.validateMappings(noTitleMappings);
       expect(result.valid).toBe(false);
-      expect(result.errors).toContain('At least one title property mapping is required');
+      expect(result.errors).toContain(
+        'At least one title property mapping is required'
+      );
     });
 
     test('複数のタイトル型マッピングでエラーになる', () => {
@@ -305,13 +315,15 @@ describe('Validator', () => {
           notionPropertyName: 'AnotherTitle',
           dataType: CONSTANTS.DATA_TYPES.TITLE,
           isRequired: false,
-          isTarget: true
-        }
+          isTarget: true,
+        },
       ];
-      
+
       const result = Validator.validateMappings(multipleTitleMappings);
       expect(result.valid).toBe(false);
-      expect(result.errors).toContain('Only one title property mapping is allowed');
+      expect(result.errors).toContain(
+        'Only one title property mapping is allowed'
+      );
     });
   });
 
@@ -322,7 +334,7 @@ describe('Validator', () => {
         notionPropertyName: 'Text',
         dataType: CONSTANTS.DATA_TYPES.RICH_TEXT,
         isRequired: false,
-        isTarget: true
+        isTarget: true,
       };
 
       // 正常な値
@@ -336,7 +348,9 @@ describe('Validator', () => {
       // 長すぎるテキスト
       result = Validator.validateRowData(['a'.repeat(2001), '', ''], [mapping]);
       expect(result.valid).toBe(false);
-      expect(result.errors).toContain("Field '0 (Text)' exceeds maximum length of 2000 characters");
+      expect(result.errors).toContain(
+        "Field '0 (Text)' exceeds maximum length of 2000 characters"
+      );
     });
 
     test('数値型の検証', () => {
@@ -345,7 +359,7 @@ describe('Validator', () => {
         notionPropertyName: 'Number',
         dataType: CONSTANTS.DATA_TYPES.NUMBER,
         isRequired: false,
-        isTarget: true
+        isTarget: true,
       };
 
       // 正常な数値
@@ -359,12 +373,16 @@ describe('Validator', () => {
       // 無効な数値
       result = Validator.validateRowData(['not a number', '', ''], [mapping]);
       expect(result.valid).toBe(false);
-      expect(result.errors).toContain("Field '0 (Number)' must be a valid number, got 'not a number'");
+      expect(result.errors).toContain(
+        "Field '0 (Number)' must be a valid number, got 'not a number'"
+      );
 
       // 無限大
       result = Validator.validateRowData([Infinity, '', ''], [mapping]);
       expect(result.valid).toBe(false);
-      expect(result.errors).toContain("Field '0 (Number)' must be a finite number, got 'Infinity'");
+      expect(result.errors).toContain(
+        "Field '0 (Number)' must be a finite number, got 'Infinity'"
+      );
     });
 
     test('日付型の検証', () => {
@@ -373,7 +391,7 @@ describe('Validator', () => {
         notionPropertyName: 'Date',
         dataType: CONSTANTS.DATA_TYPES.DATE,
         isRequired: false,
-        isTarget: true
+        isTarget: true,
       };
 
       // 正常なDate
@@ -391,7 +409,9 @@ describe('Validator', () => {
       // 無効な日付
       result = Validator.validateRowData(['invalid date', '', ''], [mapping]);
       expect(result.valid).toBe(false);
-      expect(result.errors).toContain("Field '0 (Date)' contains invalid date value 'invalid date'");
+      expect(result.errors).toContain(
+        "Field '0 (Date)' contains invalid date value 'invalid date'"
+      );
     });
 
     test('チェックボックス型の検証', () => {
@@ -400,7 +420,7 @@ describe('Validator', () => {
         notionPropertyName: 'Checkbox',
         dataType: CONSTANTS.DATA_TYPES.CHECKBOX,
         isRequired: false,
-        isTarget: true
+        isTarget: true,
       };
 
       // ブール値
@@ -424,7 +444,9 @@ describe('Validator', () => {
       // 無効な値
       result = Validator.validateRowData(['invalid', '', ''], [mapping]);
       expect(result.valid).toBe(false);
-      expect(result.errors).toContain("Field '0 (Checkbox)' must be a boolean value, got 'invalid'");
+      expect(result.errors).toContain(
+        "Field '0 (Checkbox)' must be a boolean value, got 'invalid'"
+      );
     });
 
     test('URL型の検証', () => {
@@ -433,22 +455,29 @@ describe('Validator', () => {
         notionPropertyName: 'URL',
         dataType: CONSTANTS.DATA_TYPES.URL,
         isRequired: false,
-        isTarget: true
+        isTarget: true,
       };
 
       // 正常なURL
-      let result = Validator.validateRowData(['https://example.com', '', ''], [mapping]);
+      let result = Validator.validateRowData(
+        ['https://example.com', '', ''],
+        [mapping]
+      );
       expect(result.valid).toBe(true);
 
       // 無効なURL
       result = Validator.validateRowData(['not a url', '', ''], [mapping]);
       expect(result.valid).toBe(false);
-      expect(result.errors).toContain("Field '0 (URL)' must be a valid HTTP/HTTPS URL, got 'not a url'");
+      expect(result.errors).toContain(
+        "Field '0 (URL)' must be a valid HTTP/HTTPS URL, got 'not a url'"
+      );
 
       // 非文字列
       result = Validator.validateRowData([123, '', ''], [mapping]);
       expect(result.valid).toBe(false);
-      expect(result.errors).toContain("Field '0 (URL)' must be a valid URL string, got number");
+      expect(result.errors).toContain(
+        "Field '0 (URL)' must be a valid URL string, got number"
+      );
     });
 
     test('メール型の検証', () => {
@@ -457,22 +486,29 @@ describe('Validator', () => {
         notionPropertyName: 'Email',
         dataType: CONSTANTS.DATA_TYPES.EMAIL,
         isRequired: false,
-        isTarget: true
+        isTarget: true,
       };
 
       // 正常なメール
-      let result = Validator.validateRowData(['test@example.com', '', ''], [mapping]);
+      let result = Validator.validateRowData(
+        ['test@example.com', '', ''],
+        [mapping]
+      );
       expect(result.valid).toBe(true);
 
       // 無効なメール
       result = Validator.validateRowData(['invalid email', '', ''], [mapping]);
       expect(result.valid).toBe(false);
-      expect(result.errors).toContain("Field '0 (Email)' must be a valid email address, got 'invalid email'");
+      expect(result.errors).toContain(
+        "Field '0 (Email)' must be a valid email address, got 'invalid email'"
+      );
 
       // 非文字列
       result = Validator.validateRowData([123, '', ''], [mapping]);
       expect(result.valid).toBe(false);
-      expect(result.errors).toContain("Field '0 (Email)' must be a valid email string, got number");
+      expect(result.errors).toContain(
+        "Field '0 (Email)' must be a valid email string, got number"
+      );
     });
 
     test('電話番号型の検証', () => {
@@ -481,11 +517,14 @@ describe('Validator', () => {
         notionPropertyName: 'Phone',
         dataType: CONSTANTS.DATA_TYPES.PHONE_NUMBER,
         isRequired: false,
-        isTarget: true
+        isTarget: true,
       };
 
       // 正常な電話番号
-      let result = Validator.validateRowData(['090-1234-5678', '', ''], [mapping]);
+      let result = Validator.validateRowData(
+        ['090-1234-5678', '', ''],
+        [mapping]
+      );
       expect(result.valid).toBe(true);
 
       // 数値でも可
@@ -495,7 +534,9 @@ describe('Validator', () => {
       // 無効な電話番号
       result = Validator.validateRowData(['invalid phone', '', ''], [mapping]);
       expect(result.valid).toBe(false);
-      expect(result.errors).toContain("Field '0 (Phone)' must be a valid phone number format, got 'invalid phone'");
+      expect(result.errors).toContain(
+        "Field '0 (Phone)' must be a valid phone number format, got 'invalid phone'"
+      );
     });
 
     test('セレクト型の検証', () => {
@@ -504,7 +545,7 @@ describe('Validator', () => {
         notionPropertyName: 'Select',
         dataType: CONSTANTS.DATA_TYPES.SELECT,
         isRequired: true, // 必須にする
-        isTarget: true
+        isTarget: true,
       };
 
       // 正常な選択肢
@@ -519,60 +560,137 @@ describe('Validator', () => {
       // 長すぎる選択肢
       result = Validator.validateRowData(['a'.repeat(101), '', ''], [mapping]);
       expect(result.valid).toBe(false);
-      expect(result.errors).toContain("Field '0 (Select)' select option exceeds maximum length of 100 characters");
+      expect(result.errors).toContain(
+        "Field '0 (Select)' select option exceeds maximum length of 100 characters"
+      );
     });
   });
 
   describe('canConvertToNotionType', () => {
     test('空値は常に変換可能', () => {
-      expect(Validator.canConvertToNotionType(null, CONSTANTS.DATA_TYPES.TITLE)).toBe(true);
-      expect(Validator.canConvertToNotionType(undefined, CONSTANTS.DATA_TYPES.NUMBER)).toBe(true);
-      expect(Validator.canConvertToNotionType('', CONSTANTS.DATA_TYPES.DATE)).toBe(true);
+      expect(
+        Validator.canConvertToNotionType(null, CONSTANTS.DATA_TYPES.TITLE)
+      ).toBe(true);
+      expect(
+        Validator.canConvertToNotionType(undefined, CONSTANTS.DATA_TYPES.NUMBER)
+      ).toBe(true);
+      expect(
+        Validator.canConvertToNotionType('', CONSTANTS.DATA_TYPES.DATE)
+      ).toBe(true);
     });
 
     test('テキスト型への変換', () => {
-      expect(Validator.canConvertToNotionType('text', CONSTANTS.DATA_TYPES.TITLE)).toBe(true);
-      expect(Validator.canConvertToNotionType(123, CONSTANTS.DATA_TYPES.RICH_TEXT)).toBe(true);
-      expect(Validator.canConvertToNotionType(true, CONSTANTS.DATA_TYPES.TITLE)).toBe(true);
+      expect(
+        Validator.canConvertToNotionType('text', CONSTANTS.DATA_TYPES.TITLE)
+      ).toBe(true);
+      expect(
+        Validator.canConvertToNotionType(123, CONSTANTS.DATA_TYPES.RICH_TEXT)
+      ).toBe(true);
+      expect(
+        Validator.canConvertToNotionType(true, CONSTANTS.DATA_TYPES.TITLE)
+      ).toBe(true);
     });
 
     test('数値型への変換', () => {
-      expect(Validator.canConvertToNotionType('123', CONSTANTS.DATA_TYPES.NUMBER)).toBe(true);
-      expect(Validator.canConvertToNotionType(123, CONSTANTS.DATA_TYPES.NUMBER)).toBe(true);
-      expect(Validator.canConvertToNotionType('abc', CONSTANTS.DATA_TYPES.NUMBER)).toBe(false);
-      expect(Validator.canConvertToNotionType(Infinity, CONSTANTS.DATA_TYPES.NUMBER)).toBe(false);
+      expect(
+        Validator.canConvertToNotionType('123', CONSTANTS.DATA_TYPES.NUMBER)
+      ).toBe(true);
+      expect(
+        Validator.canConvertToNotionType(123, CONSTANTS.DATA_TYPES.NUMBER)
+      ).toBe(true);
+      expect(
+        Validator.canConvertToNotionType('abc', CONSTANTS.DATA_TYPES.NUMBER)
+      ).toBe(false);
+      expect(
+        Validator.canConvertToNotionType(Infinity, CONSTANTS.DATA_TYPES.NUMBER)
+      ).toBe(false);
     });
 
     test('日付型への変換', () => {
-      expect(Validator.canConvertToNotionType('2023-01-01', CONSTANTS.DATA_TYPES.DATE)).toBe(true);
-      expect(Validator.canConvertToNotionType(new Date(), CONSTANTS.DATA_TYPES.DATE)).toBe(true);
-      expect(Validator.canConvertToNotionType('invalid date', CONSTANTS.DATA_TYPES.DATE)).toBe(false);
+      expect(
+        Validator.canConvertToNotionType(
+          '2023-01-01',
+          CONSTANTS.DATA_TYPES.DATE
+        )
+      ).toBe(true);
+      expect(
+        Validator.canConvertToNotionType(new Date(), CONSTANTS.DATA_TYPES.DATE)
+      ).toBe(true);
+      expect(
+        Validator.canConvertToNotionType(
+          'invalid date',
+          CONSTANTS.DATA_TYPES.DATE
+        )
+      ).toBe(false);
     });
 
     test('チェックボックス型への変換', () => {
-      expect(Validator.canConvertToNotionType(true, CONSTANTS.DATA_TYPES.CHECKBOX)).toBe(true);
-      expect(Validator.canConvertToNotionType(1, CONSTANTS.DATA_TYPES.CHECKBOX)).toBe(true);
-      expect(Validator.canConvertToNotionType('yes', CONSTANTS.DATA_TYPES.CHECKBOX)).toBe(true);
-      expect(Validator.canConvertToNotionType('invalid', CONSTANTS.DATA_TYPES.CHECKBOX)).toBe(false);
+      expect(
+        Validator.canConvertToNotionType(true, CONSTANTS.DATA_TYPES.CHECKBOX)
+      ).toBe(true);
+      expect(
+        Validator.canConvertToNotionType(1, CONSTANTS.DATA_TYPES.CHECKBOX)
+      ).toBe(true);
+      expect(
+        Validator.canConvertToNotionType('yes', CONSTANTS.DATA_TYPES.CHECKBOX)
+      ).toBe(true);
+      expect(
+        Validator.canConvertToNotionType(
+          'invalid',
+          CONSTANTS.DATA_TYPES.CHECKBOX
+        )
+      ).toBe(false);
     });
 
     test('URL型への変換', () => {
-      expect(Validator.canConvertToNotionType('https://example.com', CONSTANTS.DATA_TYPES.URL)).toBe(true);
-      expect(Validator.canConvertToNotionType('invalid url', CONSTANTS.DATA_TYPES.URL)).toBe(false);
+      expect(
+        Validator.canConvertToNotionType(
+          'https://example.com',
+          CONSTANTS.DATA_TYPES.URL
+        )
+      ).toBe(true);
+      expect(
+        Validator.canConvertToNotionType(
+          'invalid url',
+          CONSTANTS.DATA_TYPES.URL
+        )
+      ).toBe(false);
     });
 
     test('メール型への変換', () => {
-      expect(Validator.canConvertToNotionType('test@example.com', CONSTANTS.DATA_TYPES.EMAIL)).toBe(true);
-      expect(Validator.canConvertToNotionType('invalid email', CONSTANTS.DATA_TYPES.EMAIL)).toBe(false);
+      expect(
+        Validator.canConvertToNotionType(
+          'test@example.com',
+          CONSTANTS.DATA_TYPES.EMAIL
+        )
+      ).toBe(true);
+      expect(
+        Validator.canConvertToNotionType(
+          'invalid email',
+          CONSTANTS.DATA_TYPES.EMAIL
+        )
+      ).toBe(false);
     });
 
     test('電話番号型への変換', () => {
-      expect(Validator.canConvertToNotionType('090-1234-5678', CONSTANTS.DATA_TYPES.PHONE_NUMBER)).toBe(true);
-      expect(Validator.canConvertToNotionType('invalid phone', CONSTANTS.DATA_TYPES.PHONE_NUMBER)).toBe(false);
+      expect(
+        Validator.canConvertToNotionType(
+          '090-1234-5678',
+          CONSTANTS.DATA_TYPES.PHONE_NUMBER
+        )
+      ).toBe(true);
+      expect(
+        Validator.canConvertToNotionType(
+          'invalid phone',
+          CONSTANTS.DATA_TYPES.PHONE_NUMBER
+        )
+      ).toBe(false);
     });
 
     test('不明なデータ型', () => {
-      expect(Validator.canConvertToNotionType('value', 'unknown_type')).toBe(false);
+      expect(Validator.canConvertToNotionType('value', 'unknown_type')).toBe(
+        false
+      );
     });
   });
 
@@ -581,7 +699,7 @@ describe('Validator', () => {
       // 無効なマッピングデータで例外が発生する状況を作る
       const invalidMappings = null as any;
       const rowData = ['test', '', ''];
-      
+
       const result = Validator.validateRowData(rowData, invalidMappings);
       expect(result.valid).toBe(false);
       expect(result.errors.length).toBeGreaterThan(0);

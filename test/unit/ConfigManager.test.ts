@@ -73,23 +73,33 @@ describe('ConfigManager', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     ConfigManager.clearCache();
-    
+
     // デフォルトのconfigシートモック
     const defaultConfigSheet = createMockSheet([
       ['key', 'value', 'description'],
-      ['DATABASE_ID', '550e8400-e29b-41d4-a716-446655440000', 'Target database ID'],
+      [
+        'DATABASE_ID',
+        '550e8400-e29b-41d4-a716-446655440000',
+        'Target database ID',
+      ],
       ['PROJECT_NAME', 'Test Project', 'Project name'],
       ['VERSION', '1.0.0', 'System version'],
     ]);
-    
-    // デフォルトのマッピングシートモック  
+
+    // デフォルトのマッピングシートモック
     const defaultMappingSheet = createMockSheet([
-      ['spreadsheet_column', 'notion_property_name', 'data_type', 'is_required', 'is_target'],
+      [
+        'spreadsheet_column',
+        'notion_property_name',
+        'data_type',
+        'is_required',
+        'is_target',
+      ],
       ['A', 'Title', 'title', 'true', 'true'],
       ['B', 'Description', 'rich_text', 'false', 'true'],
-      ['C', 'Priority', 'select', 'false', 'true']
+      ['C', 'Priority', 'select', 'false', 'true'],
     ]);
-    
+
     mockSpreadsheet.getSheetByName.mockImplementation((name: string) => {
       if (name === CONSTANTS.SHEETS.CONFIG) {
         return defaultConfigSheet;
