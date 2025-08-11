@@ -472,6 +472,84 @@ export class TriggerManager {
   }
 
   /**
+   * インストール可能なトリガーを設定
+   * 単純なonEditトリガーでは外部API権限が制限されるため、
+   * インストール可能なトリガーを使用して権限問題を解決
+   */
+  static setupInstallableTriggers(): void {
+    try {
+      // 既存のトリガーをクリア
+      TriggerManager.clearAllTriggers();
+
+      // 編集トリガーを設定
+      const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+      ScriptApp.newTrigger('onEditInstallable')
+        .forSpreadsheet(spreadsheet)
+        .onEdit()
+        .create();
+
+      Logger.info('Installable triggers setup completed');
+
+      // 成功メッセージを表示
+      SpreadsheetApp.getUi().alert(
+        '設定完了',
+        'インストール可能なトリガーが正常に設定されました。\n' +
+          'これで外部APIへのアクセス権限が有効になります。',
+        SpreadsheetApp.getUi().ButtonSet.OK
+      );
+    } catch (error) {
+      Logger.error('Failed to setup installable triggers', { error });
+      SpreadsheetApp.getUi().alert(
+        'エラー',
+        'トリガーの設定に失敗しました: ' + (error as Error).message,
+        SpreadsheetApp.getUi().ButtonSet.OK
+      );
+    }
+  }
+
+  /**
+   * 既存のトリガーをすべてクリア
+   */
+  static clearAllTriggers(): void {
+    try {
+      const triggers = ScriptApp.getProjectTriggers();
+      triggers.forEach(trigger => {
+        ScriptApp.deleteTrigger(trigger);
+      });
+      Logger.info('All triggers cleared', { count: triggers.length });
+    } catch (error) {
+      Logger.error('Failed to clear triggers', { error });
+    }
+  }
+
+  /**
+   * 現在のトリガー状況を確認
+   */
+  static getTriggerStatus(): { count: number; triggers: any[] } {
+    try {
+      const triggers = ScriptApp.getProjectTriggers();
+      const triggerInfo = triggers.map(trigger => ({
+        handlerFunction: trigger.getHandlerFunction(),
+        eventType: trigger.getEventType().toString(),
+        triggerSource: trigger.getTriggerSource().toString(),
+      }));
+
+      Logger.info('Current trigger status', {
+        count: triggers.length,
+        triggers: triggerInfo,
+      });
+
+      return {
+        count: triggers.length,
+        triggers: triggerInfo,
+      };
+    } catch (error) {
+      Logger.error('Failed to get trigger status', { error });
+      return { count: 0, triggers: [] };
+    }
+  }
+
+  /**
    * パフォーマンスレポートを生成
    * @param period 期間（日数）
    */
@@ -508,21 +586,47 @@ export class TriggerManager {
  */
 
 /**
- * スプレッドシート編集トリガー関数
+ * スプレッドシート編集トリガー関数（単純トリガー）
+ * 注意: この関数では外部API権限が制限されるため、
+ * インストール可能なトリガーを推奨
  */
 declare global {
   function onEdit(e: any): void;
+  function onEditInstallable(e: any): void;
   function processImportManually(rowNumber: number): void;
   function testConnectionManually(): void;
   function getSystemHealthReport(): void;
   function clearSystemErrorHistory(): void;
   function showPerformanceReport(): void;
+  function setupTriggers(): void;
+  function clearTriggers(): void;
+  function showTriggerStatus(): void;
 }
 
 globalThis.onEdit = function (e: any): void {
+  Logger.warn(
+    'Using simple trigger onEdit - external API access may be restricted'
+  );
+  Logger.info('Consider using installable trigger for full API access');
+
   const triggerManager = TriggerManager.getInstance();
   triggerManager.onEdit(e as EditEvent).catch(error => {
     Logger.error('Unhandled error in onEdit trigger', { error });
+  });
+};
+
+/**
+ * インストール可能なトリガー用の編集ハンドラー
+ * 外部API権限が有効
+ */
+globalThis.onEditInstallable = function (e: any): void {
+  Logger.info(
+    'Using installable trigger onEditInstallable - full API access available'
+  );
+
+  const triggerManager = TriggerManager.getInstance();
+  triggerManager.onEdit(e as EditEvent).catch(error => {
+    Logger.error('Unhandled error in onEditInstallable trigger', { error });
   });
 };
 
@@ -578,4 +682,46 @@ ${health.issues.length > 0 ? '⚠️ 課題:\n' + health.issues.map(issue => `�
     .setHeight(400);
 
   ui.showModalDialog(htmlOutput, 'パフォーマンスレポート (過去7日間)');
+};
+
+/**
+ * インストール可能なトリガーを設定（管理者用）
+ */
+(globalThis as any).setupTriggers = () => {
+  TriggerManager.setupInstallableTriggers();
+};
+
+/**
+ * すべてのトリガーをクリア（管理者用）
+ */
+(globalThis as any).clearTriggers = () => {
+  TriggerManager.clearAllTriggers();
+  SpreadsheetApp.getUi().alert('すべてのトリガーをクリアしました');
+};
+
+/**
+ * 現在のトリガー状況を表示（管理者用）
+ */
+(globalThis as any).showTriggerStatus = () => {
+  const status = TriggerManager.getTriggerStatus();
+
+  let message = `現在のトリガー数: ${status.count}\n\n`;
+
+  if (status.triggers.length > 0) {
+    message += 'トリガー詳細:\n';
+    status.triggers.forEach((trigger, index) => {
+      message += `${index + 1}. 関数: ${trigger.handlerFunction}\n`;
+      message += `   イベント: ${trigger.eventType}\n`;
+      message += `   ソース: ${trigger.triggerSource}\n\n`;
+    });
+  } else {
+    message += 'トリガーが設定されていません。\n';
+    message += '「setupTriggers」関数を実行してトリガーを設定してください。';
+  }
+
+  SpreadsheetApp.getUi().alert(
+    'トリガー状況',
+    message,
+    SpreadsheetApp.getUi().ButtonSet.OK
+  );
 };

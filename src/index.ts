@@ -21,28 +21,6 @@ import { TriggerManager } from './core/TriggerManager';
 import { ConfigManager } from './core/ConfigManager';
 
 /**
- * スプレッドシート編集時のトリガー関数
- * この関数はGoogle Apps Scriptによって自動的に呼び出されます
- */
-function onEdit(e: GoogleAppsScript.Events.SheetsOnEdit): void {
-  try {
-    Logger.info('onEdit triggered', {
-      range: e.range.getA1Notation(),
-      value: e.value,
-      user: e.user?.getEmail(),
-    });
-
-    // TriggerManagerを使用して同期処理を実行
-    const triggerManager = TriggerManager.getInstance();
-    triggerManager.onEdit(e).catch(error => {
-      Logger.error('Async onEdit failed', error);
-    });
-  } catch (error) {
-    Logger.error('onEdit failed', error);
-  }
-}
-
-/**
  * システム初期化関数（手動実行用）
  */
 function initializeSystem(): void {
@@ -425,6 +403,49 @@ function diagnoseColumnMappingSheet(): void {
 }
 
 /**
+ * インストール可能なトリガーを設定する関数（手動実行用）
+ * 外部API権限問題を解決するためのトリガー設定
+ */
+function setupTriggers(): void {
+  TriggerManager.setupInstallableTriggers();
+}
+
+/**
+ * すべてのトリガーをクリアする関数（管理者用）
+ */
+function clearTriggers(): void {
+  TriggerManager.clearAllTriggers();
+  SpreadsheetApp.getUi().alert('すべてのトリガーをクリアしました');
+}
+
+/**
+ * 現在のトリガー状況を表示する関数（管理者用）
+ */
+function showTriggerStatus(): void {
+  const status = TriggerManager.getTriggerStatus();
+
+  let message = `現在のトリガー数: ${status.count}\n\n`;
+
+  if (status.triggers.length > 0) {
+    message += 'トリガー詳細:\n';
+    status.triggers.forEach((trigger: any, index: number) => {
+      message += `${index + 1}. 関数: ${trigger.handlerFunction}\n`;
+      message += `   イベント: ${trigger.eventType}\n`;
+      message += `   ソース: ${trigger.triggerSource}\n\n`;
+    });
+  } else {
+    message += 'トリガーが設定されていません。\n';
+    message += '「setupTriggers」関数を実行してトリガーを設定してください。';
+  }
+
+  SpreadsheetApp.getUi().alert(
+    'トリガー状況',
+    message,
+    SpreadsheetApp.getUi().ButtonSet.OK
+  );
+}
+
+/**
  * グローバル関数の定義（Google Apps Script用）
  * スプレッドシートから直接実行可能な関数
  */
@@ -439,3 +460,8 @@ function diagnoseColumnMappingSheet(): void {
 (globalThis as any).setNotionApiToken = setNotionApiToken;
 (globalThis as any).diagnoseProperties = diagnoseProperties;
 (globalThis as any).diagnoseColumnMappingSheet = diagnoseColumnMappingSheet;
+
+// トリガー管理用グローバル関数を定義
+(globalThis as any).setupTriggers = setupTriggers;
+(globalThis as any).clearTriggers = clearTriggers;
+(globalThis as any).showTriggerStatus = showTriggerStatus;
