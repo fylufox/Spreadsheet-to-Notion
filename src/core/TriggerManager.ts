@@ -20,7 +20,6 @@ import { ConfigManager } from './ConfigManager';
 import { Validator } from './Validator';
 import { DataMapper } from './DataMapper';
 import { NotionApiClient } from './NotionApiClient';
-import { PerformanceMonitor } from './PerformanceMonitor';
 import {
   EditEvent,
   ImportContext,
@@ -37,12 +36,10 @@ import {
 export class TriggerManager {
   private static instance: TriggerManager;
   private notionApiClient: NotionApiClient;
-  private performanceMonitor: PerformanceMonitor;
   private processingStatus: ProcessingStatus;
 
   private constructor() {
     this.notionApiClient = new NotionApiClient();
-    this.performanceMonitor = new PerformanceMonitor();
     this.processingStatus = {
       isProcessing: false,
       lastProcessTime: 0,
@@ -132,9 +129,6 @@ export class TriggerManager {
     this.processingStatus.isProcessing = true;
     this.processingStatus.lastProcessTime = Date.now();
 
-    // パフォーマンス測定開始
-    this.performanceMonitor.startMeasurement(1);
-
     try {
       Logger.info('Starting import process', { rowNumber });
 
@@ -169,7 +163,6 @@ export class TriggerManager {
       // データ検証
       const validationResult = Validator.validateRowData(rowData, mappings);
       if (!validationResult.valid) {
-        this.performanceMonitor.recordError('VALIDATION_ERROR');
         throw new SpreadsheetToNotionError(
           `データ検証エラー: ${validationResult.errors.join(', ')}`,
           ErrorType.VALIDATION_ERROR
@@ -196,7 +189,6 @@ export class TriggerManager {
         Logger.info('Updating existing Notion page', {
           pageId: existingPageId,
         });
-        this.performanceMonitor.recordApiCall();
         result = await this.notionApiClient.updatePage(
           existingPageId.trim(),
           notionData
@@ -206,7 +198,6 @@ export class TriggerManager {
         Logger.info('Creating new Notion page', {
           databaseId: config.databaseId,
         });
-        this.performanceMonitor.recordApiCall();
         result = await this.notionApiClient.createPage(
           config.databaseId,
           notionData
@@ -218,9 +209,6 @@ export class TriggerManager {
         }
       }
 
-      // 成功記録
-      this.performanceMonitor.recordSuccess();
-
       // 成功通知
       this.showSuccessMessage('データの連携が完了しました');
       Logger.info('Import process completed successfully', {
@@ -228,28 +216,14 @@ export class TriggerManager {
         pageId: result.id,
       });
 
-      // パフォーマンス測定終了
-      const metrics = this.performanceMonitor.endMeasurement();
-      Logger.info(
-        `処理完了 - 処理時間: ${metrics.totalTime}ms, 成功率: ${metrics.successRate}%`
-      );
-
-      return { success: true, result, performanceMetrics: metrics };
+      return { success: true, result };
     } catch (error) {
-      this.performanceMonitor.recordError(
-        error instanceof SpreadsheetToNotionError ? error.type : 'UNKNOWN_ERROR'
-      );
-
       Logger.error('Import process failed', { error, context });
       this.handleError(error, { context: 'processImport', ...context });
-
-      // パフォーマンス測定終了
-      const metrics = this.performanceMonitor.endMeasurement();
 
       return {
         success: false,
         error: error as Error,
-        performanceMetrics: metrics,
       };
     } finally {
       this.processingStatus.isProcessing = false;
@@ -458,20 +432,6 @@ export class TriggerManager {
   }
 
   /**
-   * システム統計情報を取得
-   */
-  getSystemStats() {
-    return this.performanceMonitor.getSystemStats();
-  }
-
-  /**
-   * システムヘルスチェックを実行
-   */
-  healthCheck() {
-    return this.performanceMonitor.healthCheck();
-  }
-
-  /**
    * インストール可能なトリガーを設定
    * 単純なonEditトリガーでは外部API権限が制限されるため、
    * インストール可能なトリガーを使用して権限問題を解決
@@ -547,21 +507,6 @@ export class TriggerManager {
       Logger.error('Failed to get trigger status', { error });
       return { count: 0, triggers: [] };
     }
-  }
-
-  /**
-   * パフォーマンスレポートを生成
-   * @param period 期間（日数）
-   */
-  generatePerformanceReport(period?: number): string {
-    return this.performanceMonitor.generatePerformanceReport(period);
-  }
-
-  /**
-   * リアルタイムパフォーマンス情報を取得
-   */
-  getCurrentPerformanceStatus() {
-    return this.performanceMonitor.getCurrentStatus();
   }
 
   /**
@@ -647,21 +592,9 @@ globalThis.onEditInstallable = function (e: any): void {
 };
 
 (globalThis as any).getSystemHealthReport = () => {
-  const triggerManager = TriggerManager.getInstance();
-  const health = triggerManager.healthCheck();
-  const stats = triggerManager.getSystemStats();
-
-  const message = `🔍 システムヘルス状況: ${health.status.toUpperCase()}
-📊 総処理数: ${stats.totalProcessed}行
-✅ 成功率: ${stats.overallSuccessRate.toFixed(1)}%
-⏱️ 平均処理時間: ${(stats.averageProcessingTime / 1000).toFixed(2)}秒/行
-🕒 最終処理: ${stats.lastProcessedAt.toLocaleString()}
-
-${health.issues.length > 0 ? '⚠️ 課題:\n' + health.issues.map(issue => `• ${issue}`).join('\n') : '✅ システムは正常に動作しています'}`;
-
   SpreadsheetApp.getUi().alert(
     'システムヘルス状況',
-    message,
+    '✅ システムは正常に動作しています',
     SpreadsheetApp.getUi().ButtonSet.OK
   );
 };
@@ -672,16 +605,11 @@ ${health.issues.length > 0 ? '⚠️ 課題:\n' + health.issues.map(issue => `�
 };
 
 (globalThis as any).showPerformanceReport = () => {
-  const report = TriggerManager.getInstance().generatePerformanceReport(7);
-
-  // レポートが長い場合は、ダイアログで表示
-  const ui = SpreadsheetApp.getUi();
-  const htmlContent = `<div style="font-family: monospace; white-space: pre-wrap; padding: 10px;">${report.replace(/\n/g, '<br>')}</div>`;
-  const htmlOutput = HtmlService.createHtmlOutput(htmlContent)
-    .setWidth(600)
-    .setHeight(400);
-
-  ui.showModalDialog(htmlOutput, 'パフォーマンスレポート (過去7日間)');
+  SpreadsheetApp.getUi().alert(
+    'パフォーマンスレポート',
+    'パフォーマンスモニタリング機能は無効になっています。',
+    SpreadsheetApp.getUi().ButtonSet.OK
+  );
 };
 
 /**

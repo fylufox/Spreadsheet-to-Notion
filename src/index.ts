@@ -83,13 +83,14 @@ function testTriggerManager(): void {
     const status = triggerManager.getProcessingStatus();
     Logger.info('Current processing status', status);
 
-    // システム統計を確認
-    const stats = triggerManager.getSystemStats();
-    Logger.info('System statistics', stats);
-
-    // ヘルスチェックを実行
-    const health = triggerManager.healthCheck();
-    Logger.info('Health check results', health);
+    // 接続テストを実行
+    triggerManager.testConnection()
+      .then(result => {
+        Logger.info('Connection test results', result);
+      })
+      .catch(error => {
+        Logger.error('Connection test failed', error);
+      });
 
     Logger.info('TriggerManager test completed');
   } catch (error) {

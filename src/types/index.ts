@@ -88,33 +88,6 @@ export interface ImportResult {
   success: boolean;
   result?: NotionPageResponse;
   error?: Error;
-  performanceMetrics?: PerformanceMetrics;
-}
-
-/**
- * パフォーマンス測定結果
- */
-export interface PerformanceMetrics {
-  /** 処理開始時刻 */
-  startTime: Date;
-  /** 処理終了時刻 */
-  endTime: Date;
-  /** 総処理時間（ミリ秒） */
-  totalTime: number;
-  /** 処理行数 */
-  processedRows: number;
-  /** 1行あたりの平均処理時間（ミリ秒） */
-  averageTimePerRow: number;
-  /** API呼び出し回数 */
-  apiCallCount: number;
-  /** 成功した処理数 */
-  successCount: number;
-  /** エラー発生数 */
-  errorCount: number;
-  /** 成功率（%） */
-  successRate: number;
-  /** メモリ使用量（概算） */
-  memoryUsage?: number;
 }
 
 /**
