@@ -78,10 +78,11 @@ export class DataMapper {
         );
 
         if (columnIndex === -1) {
-          Logger.warn(
-            `Column '${mapping.spreadsheetColumn}' not found in row data`,
-            { rowIndex }
+          const errorMessage = this.generateColumnNotFoundError(
+            mapping.spreadsheetColumn,
+            rowData
           );
+          Logger.warn(errorMessage, { rowIndex });
           continue;
         }
 
@@ -560,7 +561,55 @@ export class DataMapper {
       }
     }
 
+    // 警告: 文字列カラム名は現在サポートされていません
+    // ここで-1を返す前に、より詳細なエラーメッセージを提供
+    Logger.warn(
+      `Unsupported column name format: '${columnName}'. Use numeric index (0, 1, 2...) or alphabetic column (A, B, C...) instead.`,
+      {
+        columnName,
+        supportedFormats: [
+          '0, 1, 2... (numeric index)',
+          'A, B, C... (alphabetic)',
+        ],
+        receivedFormat: typeof columnName,
+      }
+    );
+
     return -1;
+  }
+
+  /**
+   * カラムが見つからない場合の詳細なエラーメッセージを生成
+   */
+  private static generateColumnNotFoundError(
+    columnName: string,
+    rowData: any[]
+  ): string {
+    const baseMessage = `Column '${columnName}' not found in row data`;
+
+    // 数値でもアルファベットでもない場合の詳細説明
+    if (!/^[0-9]+$/.test(columnName) && !/^[A-Z]+$/i.test(columnName)) {
+      return `${baseMessage}. Column name '${columnName}' is not a valid format. Use numeric index (0, 1, 2...) or alphabetic column (A, B, C...). Available data columns: ${rowData.length}`;
+    }
+
+    // 範囲外の場合の説明
+    const index = parseInt(columnName, 10);
+    if (!isNaN(index)) {
+      return `${baseMessage}. Column index '${columnName}' is out of range. Available columns: 0-${rowData.length - 1}`;
+    }
+
+    // アルファベットの場合の変換チェック
+    if (/^[A-Z]+$/i.test(columnName)) {
+      let result = 0;
+      const upperCol = columnName.toUpperCase();
+      for (let i = 0; i < upperCol.length; i++) {
+        result = result * 26 + (upperCol.charCodeAt(i) - 'A'.charCodeAt(0) + 1);
+      }
+      const zeroBasedIndex = result - 1;
+      return `${baseMessage}. Column '${columnName}' converts to index ${zeroBasedIndex}, but only ${rowData.length} columns available (0-${rowData.length - 1})`;
+    }
+
+    return baseMessage;
   }
 
   /**

@@ -203,6 +203,20 @@ export class ConfigManager {
           return;
         }
 
+        // カラム名の形式チェック
+        if (!this.isValidColumnName(spreadsheetColumn)) {
+          const error = `Row ${rowNumber}: Invalid column name format '${spreadsheetColumn}'. Use numeric index (0, 1, 2...) or alphabetic column (A, B, C...)`;
+          errors.push(error);
+          Logger.warn(`Invalid column name format at row ${rowNumber}`, {
+            spreadsheetColumn,
+            suggestedFormats: [
+              '0, 1, 2... (numeric index)',
+              'A, B, C... (alphabetic)',
+            ],
+          });
+          return;
+        }
+
         // 有効なマッピングを追加
         mappings.push({
           spreadsheetColumn,
@@ -500,5 +514,22 @@ export class ConfigManager {
     });
 
     return { healthy, issues };
+  }
+
+  /**
+   * カラム名の形式が有効かどうかをチェック
+   */
+  private static isValidColumnName(columnName: string): boolean {
+    // 数値文字列（0, 1, 2...）
+    if (/^[0-9]+$/.test(columnName)) {
+      return true;
+    }
+
+    // アルファベットカラム名（A, B, C...）
+    if (/^[A-Z]+$/i.test(columnName)) {
+      return true;
+    }
+
+    return false;
   }
 }

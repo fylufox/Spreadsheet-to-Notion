@@ -1,41 +1,41 @@
 [
   {
-    "spreadsheet_column": "title",
+    "spreadsheet_column": "C",
     "notion_property": "Title",
     "notion_type": "title"
   },
   {
-    "spreadsheet_column": "description", 
+    "spreadsheet_column": "D", 
     "notion_property": "Description",
     "notion_type": "rich_text"
   },
   {
-    "spreadsheet_column": "priority",
+    "spreadsheet_column": "E",
     "notion_property": "Priority", 
     "notion_type": "select"
   },
   {
-    "spreadsheet_column": "deadline",
+    "spreadsheet_column": "F",
     "notion_property": "Deadline",
     "notion_type": "date"
   },
   {
-    "spreadsheet_column": "assignee",
+    "spreadsheet_column": "G",
     "notion_property": "Assignee",
     "notion_type": "rich_text"
   },
   {
-    "spreadsheet_column": "tags",
+    "spreadsheet_column": "H",
     "notion_property": "Tags",
     "notion_type": "multi_select"
   },
   {
-    "spreadsheet_column": "url",
+    "spreadsheet_column": "I",
     "notion_property": "URL",
     "notion_type": "url"
   },
   {
-    "spreadsheet_column": "email",
+    "spreadsheet_column": "J",
     "notion_property": "Email",
     "notion_type": "email"
   }

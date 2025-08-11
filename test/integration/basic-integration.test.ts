@@ -29,7 +29,7 @@ import { ColumnMapping } from '../../src/types';
 // 基本設定データ
 const testMappings: ColumnMapping[] = [
   {
-    spreadsheetColumn: 'title',
+    spreadsheetColumn: 'C',
     notionPropertyName: 'Title',
     dataType: 'title',
     isTarget: true,
