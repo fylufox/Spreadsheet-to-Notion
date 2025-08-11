@@ -1,152 +1,231 @@
 # Validator モジュール詳細設計
 
-## 1. 役割
-データの検証を行う。スプレッドシートデータの形式チェック、必須項目チェック、Notionプロパティとの互換性チェックを担当する。
+## 1. 概要
 
-## 2. 関数
+### 1.1 役割
+データ検証を担当する静的クラス。スプレッドシートデータの形式チェック、必須項目チェック、Notionプロパティとの互換性チェック、型ガード機能を提供する。
 
-### 2.1 validateRowData(rowData, mappings)
-**概要:** 行データの検証
-**引数:**
-- `rowData` (Array): 検証対象の行データ
-- `mappings` (Array<ColumnMapping>): カラムマッピング
-**戻り値:** `ValidationResult`
+### 1.2 設計パターン
+- **静的クラス設計:** インスタンス化不要、純粋関数による検証
+- **型ガード実装:** TypeScript型システムとの統合
+- **詳細エラー情報:** 修正方法を含む具体的なエラーメッセージ
+- **バッチ検証対応:** 大量データの効率的な検証
 
-```javascript
-function validateRowData(rowData, mappings) {
-  const errors = [];
+## 2. 主要メソッド
+
+### 2.1 validateRowData(rowData: any[], mappings: ColumnMapping[]): ValidationResult
+**概要:** 行データの包括的検証（型安全性・必須項目・データ整合性）
+```typescript
+static validateRowData(rowData: any[], mappings: ColumnMapping[]): ValidationResult {
+  Logger.startTimer('Validator.validateRowData');
   
-  mappings.forEach((mapping, index) => {
-    if (!mapping.isTarget) return;
+  try {
+    const errors: string[] = [];
     
-    const value = rowData[index + CONSTANTS.COLUMNS.DATA_START - 1];
-    
-    // 必須チェック
-    if (mapping.isRequired && (value === null || value === undefined || value === '')) {
-      errors.push(`${mapping.spreadsheetColumn}: 必須項目です`);
+    // 基本構造チェック
+    if (!Array.isArray(rowData)) {
+      errors.push('Row data must be an array');
+      return { valid: false, errors };
     }
     
-    // データ型チェック
-    const typeError = validateDataType(value, mapping.dataType, mapping.spreadsheetColumn);
-    if (typeError) {
-      errors.push(typeError);
+    if (!Array.isArray(mappings)) {
+      errors.push('Mappings must be an array');
+      return { valid: false, errors };
     }
-  });
-  
-  if (errors.length > 0) {
-    throw new ValidationError('データ検証エラー', errors);
+    
+    // 各マッピングに対する検証
+    mappings.forEach((mapping, index) => {
+      if (!mapping.isTarget) return;
+      
+      try {
+        const columnIndex = DataMapper.getColumnIndex(mapping.spreadsheetColumn);
+        const value = rowData[columnIndex];
+        
+        // 必須項目チェック
+        if (mapping.isRequired && this.isEmptyValue(value)) {
+          errors.push(`${mapping.spreadsheetColumn}: Required field is empty`);
+          return;
+        }
+        
+        // 空値の場合は型チェックスキップ
+        if (this.isEmptyValue(value)) {
+          return;
+        }
+        
+        // データ型検証
+        const typeError = this.validateDataType(value, mapping.dataType, mapping.spreadsheetColumn);
+        if (typeError) {
+          errors.push(typeError);
+        }
+        
+        // 文字列長制限チェック
+        if (typeof value === 'string' && value.length > CONSTANTS.VALIDATION.MAX_STRING_LENGTH) {
+          errors.push(`${mapping.spreadsheetColumn}: Text too long (max ${CONSTANTS.VALIDATION.MAX_STRING_LENGTH} characters)`);
+        }
+      } catch (error) {
+        errors.push(`${mapping.spreadsheetColumn}: Validation error - ${error instanceof Error ? error.message : String(error)}`);
+      }
+    });
+    
+    const result = { valid: errors.length === 0, errors };
+    
+    Logger.debug('Row validation completed', {
+      valid: result.valid,
+      errorCount: errors.length,
+      mappingCount: mappings.filter(m => m.isTarget).length
+    });
+    
+    return result;
+  } catch (error) {
+    Logger.logError('Validator.validateRowData', error);
+    return {
+      valid: false,
+      errors: [`Validation process failed: ${error instanceof Error ? error.message : String(error)}`]
+    };
+  } finally {
+    Logger.endTimer('Validator.validateRowData');
   }
-  
-  return { valid: true, errors: [] };
 }
 ```
 
-### 2.2 validateDataType(value, dataType, columnName)
-**概要:** 個別値のデータ型検証
-**引数:**
-- `value` (any): 検証対象値
-- `dataType` (string): 期待するデータ型
-- `columnName` (string): カラム名（エラーメッセージ用）
-**戻り値:** `string | null` (エラーメッセージまたはnull)
-
-```javascript
-function validateDataType(value, dataType, columnName) {
-  if (value === null || value === undefined || value === '') {
+### 2.2 validateDataType(value: any, dataType: string, columnName: string): string | null
+**概要:** 型ガード機能付きデータ型検証
+```typescript
+private static validateDataType(value: any, dataType: string, columnName: string): string | null {
+  if (this.isEmptyValue(value)) {
     return null; // 空値は型チェック対象外
   }
   
-  switch (dataType) {
-    case 'number':
-      if (isNaN(parseFloat(value))) {
-        return `${columnName}: 数値である必要があります (入力値: ${value})`;
-      }
-      break;
-      
-    case 'date':
-      if (!isValidDate(value)) {
-        return `${columnName}: 有効な日付形式である必要があります (入力値: ${value})`;
-      }
-      break;
-      
-    case 'url':
-      if (!isValidUrl(value)) {
-        return `${columnName}: 有効なURL形式である必要があります (入力値: ${value})`;
-      }
-      break;
-      
-    case 'email':
-      if (!isValidEmail(value)) {
-        return `${columnName}: 有効なメール形式である必要があります (入力値: ${value})`;
-      }
-      break;
-      
-    case 'phone_number':
-      if (!isValidPhoneNumber(value)) {
-        return `${columnName}: 有効な電話番号形式である必要があります (入力値: ${value})`;
-      }
-      break;
-      
-    case 'checkbox':
-      if (!isValidBoolean(value)) {
-        return `${columnName}: true/false または チェック状態である必要があります (入力値: ${value})`;
-      }
-      break;
+  try {
+    switch (dataType) {
+      case CONSTANTS.DATA_TYPES.NUMBER:
+        if (!this.isValidNumber(value)) {
+          return `${columnName}: Must be a valid number (input: ${value})`;
+        }
+        break;
+        
+      case CONSTANTS.DATA_TYPES.DATE:
+        if (!this.isValidDate(value)) {
+          return `${columnName}: Must be a valid date format (input: ${value})`;
+        }
+        break;
+        
+      case CONSTANTS.DATA_TYPES.URL:
+        if (!this.isValidUrl(value)) {
+          return `${columnName}: Must be a valid URL (input: ${value})`;
+        }
+        break;
+        
+      case CONSTANTS.DATA_TYPES.EMAIL:
+        if (!this.isValidEmail(value)) {
+          return `${columnName}: Must be a valid email address (input: ${value})`;
+        }
+        break;
+        
+      case CONSTANTS.DATA_TYPES.PHONE_NUMBER:
+        if (!this.isValidPhoneNumber(value)) {
+          return `${columnName}: Must be a valid phone number (input: ${value})`;
+        }
+        break;
+        
+      case CONSTANTS.DATA_TYPES.CHECKBOX:
+        if (!this.isValidBoolean(value)) {
+          return `${columnName}: Must be true/false or checkbox value (input: ${value})`;
+        }
+        break;
+        
+      case CONSTANTS.DATA_TYPES.MULTI_SELECT:
+        if (!this.isValidMultiSelect(value)) {
+          return `${columnName}: Must be comma-separated values (input: ${value})`;
+        }
+        break;
+        
+      case CONSTANTS.DATA_TYPES.TITLE:
+      case CONSTANTS.DATA_TYPES.RICH_TEXT:
+      case CONSTANTS.DATA_TYPES.SELECT:
+        // 文字列型は基本的にそのまま通す
+        break;
+        
+      default:
+        return `${columnName}: Unsupported data type: ${dataType}`;
+    }
+    
+    return null;
+  } catch (error) {
+    return `${columnName}: Type validation failed - ${error instanceof Error ? error.message : String(error)}`;
   }
-  
-  return null;
 }
 ```
 
-### 2.3 isValidDate(value)
-**概要:** 日付形式の検証
-**引数:**
-- `value` (any): 検証対象値
-**戻り値:** `boolean`
+### 2.3 型ガード関数群
 
-```javascript
-function isValidDate(value) {
-  if (value instanceof Date) {
-    return !isNaN(value.getTime());
-  }
-  
+#### isValidNumber(value: any): value is number
+```typescript
+private static isValidNumber(value: any): value is number {
   if (typeof value === 'number') {
-    // Excelシリアル値の場合
-    return value > 0 && value < 2958466; // 1900年～9999年の範囲
+    return !isNaN(value) && isFinite(value);
   }
   
   if (typeof value === 'string') {
-    // 様々な日付フォーマットをサポート
-    const dateFormats = [
-      /^\d{4}-\d{2}-\d{2}$/,           // YYYY-MM-DD
-      /^\d{2}\/\d{2}\/\d{4}$/,         // MM/DD/YYYY
-      /^\d{4}\/\d{2}\/\d{2}$/,         // YYYY/MM/DD
-      /^\d{2}-\d{2}-\d{4}$/,           // MM-DD-YYYY
-      /^\d{4}\.\d{2}\.\d{2}$/          // YYYY.MM.DD
-    ];
-    
-    const isFormatValid = dateFormats.some(format => format.test(value));
-    if (!isFormatValid) return false;
-    
-    const date = new Date(value);
-    return !isNaN(date.getTime());
+    const num = parseFloat(value.trim());
+    return !isNaN(num) && isFinite(num);
   }
   
   return false;
 }
 ```
 
-### 2.4 isValidUrl(value)
-**概要:** URL形式の検証
-**引数:**
-- `value` (any): 検証対象値
-**戻り値:** `boolean`
+#### isValidDate(value: any): boolean
+```typescript
+private static isValidDate(value: any): boolean {
+  if (value instanceof Date) {
+    return !isNaN(value.getTime());
+  }
+  
+  if (typeof value === 'number') {
+    // Excelシリアル値対応 (1900-9999年の範囲)
+    return value > 0 && value < 2958466;
+  }
+  
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (trimmed === '') return false;
+    
+    // ISO 8601形式チェック
+    if (CONSTANTS.VALIDATION.DATE_ISO_REGEX.test(trimmed)) {
+      const date = new Date(trimmed);
+      return !isNaN(date.getTime());
+    }
+    
+    // その他の一般的な日付形式
+    const dateFormats = [
+      /^\d{2}\/\d{2}\/\d{4}$/,         // MM/DD/YYYY
+      /^\d{4}\/\d{2}\/\d{2}$/,         // YYYY/MM/DD
+      /^\d{2}-\d{2}-\d{4}$/,           // MM-DD-YYYY
+      /^\d{4}\.\d{2}\.\d{2}$/          // YYYY.MM.DD
+    ];
+    
+    const isFormatValid = dateFormats.some(format => format.test(trimmed));
+    if (isFormatValid) {
+      const date = new Date(trimmed);
+      return !isNaN(date.getTime());
+    }
+  }
+  
+  return false;
+}
+```
 
-```javascript
-function isValidUrl(value) {
+#### isValidUrl(value: any): boolean
+```typescript
+private static isValidUrl(value: any): boolean {
   if (typeof value !== 'string') return false;
   
+  const trimmed = value.trim();
+  if (trimmed === '') return false;
+  
   try {
-    const url = new URL(value);
+    const url = new URL(trimmed);
     return ['http:', 'https:'].includes(url.protocol);
   } catch {
     return false;
@@ -154,220 +233,165 @@ function isValidUrl(value) {
 }
 ```
 
-### 2.5 isValidEmail(value)
-**概要:** メールアドレス形式の検証
-**引数:**
-- `value` (any): 検証対象値
-**戻り値:** `boolean`
-
-```javascript
-function isValidEmail(value) {
+#### isValidEmail(value: any): boolean
+```typescript
+private static isValidEmail(value: any): boolean {
   if (typeof value !== 'string') return false;
   
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(value);
+  const trimmed = value.trim();
+  if (trimmed === '') return false;
+  
+  // RFC 5322準拠の簡易版正規表現
+  const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+  return emailRegex.test(trimmed);
 }
 ```
 
-### 2.6 isValidPhoneNumber(value)
-**概要:** 電話番号形式の検証
-**引数:**
-- `value` (any): 検証対象値
-**戻り値:** `boolean`
-
-```javascript
-function isValidPhoneNumber(value) {
-  if (typeof value !== 'string') return false;
+### 2.4 validateConfig(config: SystemConfig): ValidationResult
+**概要:** システム設定の包括的検証
+```typescript
+static validateConfig(config: SystemConfig): ValidationResult {
+  Logger.startTimer('Validator.validateConfig');
   
-  // 数字、ハイフン、括弧、プラス記号、スペースを許可
-  const phoneRegex = /^[\d\s\-\(\)\+]+$/;
-  return phoneRegex.test(value) && value.replace(/[\s\-\(\)\+]/g, '').length >= 10;
+  try {
+    const errors: string[] = [];
+    
+    // 必須項目チェック
+    if (!config.databaseId) {
+      errors.push('Database ID is required');
+    } else if (!this.isValidDatabaseId(config.databaseId)) {
+      errors.push('Invalid database ID format');
+    }
+    
+    if (!config.apiToken) {
+      errors.push('API token is required');
+    } else if (!this.isValidApiToken(config.apiToken)) {
+      errors.push('Invalid API token format');
+    }
+    
+    if (!config.projectName) {
+      errors.push('Project name is required');
+    } else if (config.projectName.length > CONSTANTS.VALIDATION.MAX_PROJECT_NAME_LENGTH) {
+      errors.push(`Project name too long (max ${CONSTANTS.VALIDATION.MAX_PROJECT_NAME_LENGTH} characters)`);
+    }
+    
+    // 任意項目の検証
+    if (config.webhookUrl && !this.isValidUrl(config.webhookUrl)) {
+      errors.push('Invalid webhook URL format');
+    }
+    
+    const result = { valid: errors.length === 0, errors };
+    
+    Logger.debug('Config validation completed', {
+      valid: result.valid,
+      errorCount: errors.length
+    });
+    
+    return result;
+  } catch (error) {
+    Logger.logError('Validator.validateConfig', error);
+    return {
+      valid: false,
+      errors: [`Config validation failed: ${error instanceof Error ? error.message : String(error)}`]
+    };
+  } finally {
+    Logger.endTimer('Validator.validateConfig');
+  }
 }
 ```
 
-### 2.7 isValidBoolean(value)
-**概要:** ブール値の検証
-**引数:**
-- `value` (any): 検証対象値
-**戻り値:** `boolean`
+### 2.5 バッチ検証・ユーティリティメソッド
 
-```javascript
-function isValidBoolean(value) {
-  if (typeof value === 'boolean') return true;
+#### validateBatchData(batchData: any[][], mappings: ColumnMapping[]): BatchValidationResult
+```typescript
+static validateBatchData(batchData: any[][], mappings: ColumnMapping[]): BatchValidationResult {
+  Logger.startTimer('Validator.validateBatchData');
   
-  if (typeof value === 'string') {
-    const lowerValue = value.toLowerCase();
-    return ['true', 'false', 'yes', 'no', '1', '0', 'on', 'off'].includes(lowerValue);
+  try {
+    const results: BatchValidationResult = {
+      valid: [],
+      invalid: [],
+      totalCount: batchData.length
+    };
+    
+    batchData.forEach((rowData, index) => {
+      try {
+        const result = this.validateRowData(rowData, mappings);
+        if (result.valid) {
+          results.valid.push({
+            rowIndex: index,
+            rowData: rowData,
+            result: result
+          });
+        } else {
+          results.invalid.push({
+            rowIndex: index,
+            rowData: rowData,
+            errors: result.errors
+          });
+        }
+      } catch (error) {
+        results.invalid.push({
+          rowIndex: index,
+          rowData: rowData,
+          errors: [error instanceof Error ? error.message : String(error)]
+        });
+      }
+    });
+    
+    Logger.info('Batch validation completed', {
+      totalCount: results.totalCount,
+      validCount: results.valid.length,
+      invalidCount: results.invalid.length
+    });
+    
+    return results;
+  } catch (error) {
+    Logger.logError('Validator.validateBatchData', error);
+    throw new ValidationError(
+      'Batch validation failed',
+      [error instanceof Error ? error.message : String(error)]
+    );
+  } finally {
+    Logger.endTimer('Validator.validateBatchData');
   }
-  
-  if (typeof value === 'number') {
-    return value === 0 || value === 1;
-  }
-  
-  return false;
 }
 ```
 
-### 2.8 validateConfig(config)
-**概要:** システム設定の検証
-**引数:**
-- `config` (SystemConfig): 検証対象設定
-**戻り値:** `ValidationResult`
-
-```javascript
-function validateConfig(config) {
-  const errors = [];
-  
-  // 必須項目チェック
-  if (!config.databaseId) {
-    errors.push('データベースIDが設定されていません');
-  } else if (!isValidDatabaseId(config.databaseId)) {
-    errors.push('データベースIDの形式が正しくありません');
-  }
-  
-  if (!config.apiToken) {
-    errors.push('APIトークンが設定されていません');
-  } else if (!isValidApiToken(config.apiToken)) {
-    errors.push('APIトークンの形式が正しくありません');
-  }
-  
-  if (!config.projectName) {
-    errors.push('プロジェクト名が設定されていません');
-  }
-  
-  if (errors.length > 0) {
-    throw new ValidationError('設定検証エラー', errors);
-  }
-  
-  return { valid: true, errors: [] };
+#### isEmptyValue(value: any): boolean
+```typescript
+private static isEmptyValue(value: any): boolean {
+  return value === null || 
+         value === undefined || 
+         value === '' || 
+         value === 'null' || 
+         value === 'undefined' ||
+         (typeof value === 'string' && value.trim() === '');
 }
 ```
 
-### 2.9 isValidDatabaseId(databaseId)
-**概要:** NotionデータベースIDの形式検証
-**引数:**
-- `databaseId` (string): データベースID
-**戻り値:** `boolean`
-
-```javascript
-function isValidDatabaseId(databaseId) {
+#### isValidDatabaseId(databaseId: string): boolean
+```typescript
+private static isValidDatabaseId(databaseId: string): boolean {
   if (typeof databaseId !== 'string') return false;
   
-  // 32文字の16進数文字列
-  const dbIdRegex = /^[a-f0-9]{32}$/;
-  return dbIdRegex.test(databaseId);
+  // UUID v4形式 (ハイフンありまたはなし)
+  const dbIdRegex = /^[a-f0-9]{8}-?[a-f0-9]{4}-?[a-f0-9]{4}-?[a-f0-9]{4}-?[a-f0-9]{12}$/i;
+  return dbIdRegex.test(databaseId.replace(/-/g, ''));
 }
 ```
 
-### 2.10 isValidApiToken(apiToken)
-**概要:** Notion APIトークンの形式検証
-**引数:**
-- `apiToken` (string): APIトークン
-**戻り値:** `boolean`
-
-```javascript
-function isValidApiToken(apiToken) {
+#### isValidApiToken(apiToken: string): boolean
+```typescript
+private static isValidApiToken(apiToken: string): boolean {
   if (typeof apiToken !== 'string') return false;
   
-  // secret_ で始まる形式
-  return apiToken.startsWith('secret_') && apiToken.length > 50;
+  // secret_ で始まる50文字以上
+  return apiToken.startsWith('secret_') && apiToken.length >= 50;
 }
 ```
 
-### 2.11 validateBatchData(batchData, mappings)
-**概要:** バッチデータの検証
-**引数:**
-- `batchData` (Array<Array>): バッチデータ
-- `mappings` (Array<ColumnMapping>): カラムマッピング
-**戻り値:** `BatchValidationResult`
-
-```javascript
-function validateBatchData(batchData, mappings) {
-  const results = {
-    valid: [],
-    invalid: [],
-    totalCount: batchData.length
-  };
-  
-  batchData.forEach((rowData, index) => {
-    try {
-      const result = validateRowData(rowData, mappings);
-      results.valid.push({
-        rowIndex: index,
-        rowData: rowData,
-        result: result
-      });
-    } catch (error) {
-      if (error instanceof ValidationError) {
-        results.invalid.push({
-          rowIndex: index,
-          rowData: rowData,
-          errors: error.errors
-        });
-      } else {
-        results.invalid.push({
-          rowIndex: index,
-          rowData: rowData,
-          errors: [error.message]
-        });
-      }
-    }
-  });
-  
-  return results;
-}
-```
-
-### 2.12 validateNotionPropertyValue(value, propertyConfig)
-**概要:** Notionプロパティ設定に対する値の検証
-**引数:**
-- `value` (any): 検証対象値
-- `propertyConfig` (PropertyConfig): プロパティ設定
-**戻り値:** `string | null`
-
-```javascript
-function validateNotionPropertyValue(value, propertyConfig) {
-  if (value === null || value === undefined || value === '') {
-    return propertyConfig.required ? 'この項目は必須です' : null;
-  }
-  
-  switch (propertyConfig.type) {
-    case 'select':
-      if (propertyConfig.options) {
-        const validOptions = propertyConfig.options.map(opt => opt.name);
-        if (!validOptions.includes(String(value))) {
-          return `選択可能な値: ${validOptions.join(', ')}`;
-        }
-      }
-      break;
-      
-    case 'multi_select':
-      if (propertyConfig.options) {
-        const values = String(value).split(',').map(v => v.trim());
-        const validOptions = propertyConfig.options.map(opt => opt.name);
-        const invalidValues = values.filter(v => !validOptions.includes(v));
-        
-        if (invalidValues.length > 0) {
-          return `無効な選択肢: ${invalidValues.join(', ')}`;
-        }
-      }
-      break;
-      
-    case 'number':
-      if (propertyConfig.format === 'percent') {
-        const num = parseFloat(value);
-        if (num < 0 || num > 100) {
-          return 'パーセンテージは0-100の範囲で入力してください';
-        }
-      }
-      break;
-  }
-  
-  return null;
-}
-```
-
-## 3. データ構造
+## 3. 型定義
 
 ```typescript
 interface ValidationResult {
@@ -389,108 +413,101 @@ interface BatchValidationResult {
   totalCount: number;
 }
 
-interface PropertyConfig {
-  type: string;
-  required: boolean;
-  options?: Array<{ name: string; color: string }>;
-  format?: string;
+interface SystemConfig {
+  databaseId: string;
+  apiToken: string;
+  projectName: string;
+  webhookUrl?: string;
 }
 
 class ValidationError extends Error {
-  constructor(message: string, public errors: string[]) {
+  constructor(
+    message: string,
+    public errors: string[]
+  ) {
     super(message);
     this.name = 'ValidationError';
   }
 }
 ```
 
-## 4. プロパティ/変数
+## 4. エラーハンドリング
 
-```javascript
-const VALIDATOR = {
-  // 検証設定
-  VALIDATION_RULES: {
-    MAX_STRING_LENGTH: 2000,
-    MAX_MULTI_SELECT_COUNT: 100,
-    DATE_MIN_YEAR: 1900,
-    DATE_MAX_YEAR: 9999
-  },
-  
-  // エラーメッセージテンプレート
-  ERROR_MESSAGES: {
-    REQUIRED: '${field}: 必須項目です',
-    INVALID_TYPE: '${field}: ${type}形式である必要があります',
-    INVALID_OPTION: '${field}: 選択可能な値ではありません',
-    TOO_LONG: '${field}: 文字数が上限を超えています',
-    OUT_OF_RANGE: '${field}: 値が許可範囲外です'
-  },
-  
-  // 正規表現パターン
-  REGEX_PATTERNS: {
-    EMAIL: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-    URL: /^https?:\/\/[^\s]+$/,
-    PHONE: /^[\d\s\-\(\)\+]+$/,
-    DATABASE_ID: /^[a-f0-9]{32}$/,
-    DATE_ISO: /^\d{4}-\d{2}-\d{2}$/
+### 4.1 ValidationError
+```typescript
+class ValidationError extends Error {
+  constructor(
+    message: string,
+    public errors: string[]
+  ) {
+    super(message);
+    this.name = 'ValidationError';
   }
-};
+}
 ```
 
-## 5. エラーハンドリング
+### 4.2 エラーパターン
+- **型不一致エラー:** 期待される型と異なる値
+- **必須項目エラー:** 必須フィールドの未設定
+- **形式エラー:** URL・メール・日付等の形式違反
+- **範囲外エラー:** 許可範囲を超える値
+- **長さ制限エラー:** 文字列長・配列長の上限超過
 
-### 5.1 処理可能なエラー
-- データ型不一致（TYPE_MISMATCH_ERROR）
-- 必須項目欠損（REQUIRED_FIELD_ERROR）
-- 形式エラー（FORMAT_ERROR）
-- 範囲外エラー（OUT_OF_RANGE_ERROR）
-- 選択肢不一致（INVALID_OPTION_ERROR）
+### 4.3 詳細エラー情報
+- **修正方法:** 具体的な修正指示
+- **期待値:** 正しい形式・値の例示
+- **現在値:** 問題のある入力値の表示
 
-### 5.2 エラー処理方針
-- 検証エラーは詳細な情報と修正方法を提供
-- バッチ処理では部分的失敗を許容
-- ユーザーフレンドリーなエラーメッセージ
+## 5. パフォーマンス特性
 
-## 6. パフォーマンス考慮事項
+### 5.1 計算量
+- validateRowData: O(n) (nはマッピング数)
+- validateBatchData: O(n×m) (n行数, mマッピング数)
+- 型ガード関数: O(1) (定数時間)
 
-### 6.1 最適化ポイント
-- 正規表現のコンパイル最適化
-- バッチ検証時のメモリ使用量
-- 早期リターンによる無駄な処理の削減
+### 5.2 最適化
+- 正規表現の事前コンパイル
+- 早期リターンによる不要処理回避
+- メモリ効率的なエラー収集
 
-### 6.2 制限事項
-- 大量データ検証時のタイムアウト対策
-- メモリ使用量の監視
+## 6. テスト戦略
 
-## 7. 国際化対応
-
-### 7.1 多言語エラーメッセージ
-```javascript
-const ERROR_MESSAGES_JA = {
-  REQUIRED: '${field}は必須項目です',
-  INVALID_EMAIL: '${field}は有効なメールアドレスを入力してください',
-  INVALID_URL: '${field}は有効なURLを入力してください',
-  INVALID_DATE: '${field}は有効な日付を入力してください'
-};
-```
-
-## 8. 依存関係
-
-### 8.1 依存モジュール
-- Constants: 定数定義
-- Logger: ログ出力
-
-### 8.2 外部依存
-- JavaScript標準ライブラリ（正規表現、Date等）
-
-## 9. テスト観点
-
-### 9.1 単体テスト項目
+### 6.1 単体テスト (Validator.test.ts)
 - 各データ型の正常値・異常値検証
-- 境界値テスト
-- 正規表現パターンの動作確認
+- 境界値テスト（最大長・最小値等）
+- 型ガード関数の動作確認
 - エラーメッセージの内容確認
 
-### 9.2 統合テスト項目
-- 実際のスプレッドシートデータでの検証
-- Notionプロパティ設定との互換性確認
-- 大量データの検証性能
+### 6.2 統合テスト
+- 実スプレッドシートデータでの検証
+- Notionプロパティとの互換性確認
+- 大量データ検証のパフォーマンス
+
+## 7. 設計考慮事項
+
+### 7.1 型安全性
+- TypeScript strict mode対応
+- 型ガード関数による実行時検証
+- null安全な実装
+
+### 7.2 ユーザビリティ
+- 分かりやすいエラーメッセージ
+- 修正方法の具体的な提示
+- 複数エラーの一括表示
+
+### 7.3 拡張性
+- 新データ型の追加容易性
+- カスタム検証ルールの挿入
+- 国際化対応の準備
+
+## 8. 関連モジュール
+
+### 8.1 依存関係
+- **Constants:** 検証ルール・正規表現定数
+- **Logger:** 処理ログ・パフォーマンス計測
+- **types/index.ts:** 型定義
+
+### 8.2 使用箇所
+- **DataMapper:** データ変換前の事前検証
+- **TriggerManager:** 同期処理での入力検証
+- **ConfigManager:** 設定値の整合性確認

@@ -1,209 +1,166 @@
 # NotionApiClient モジュール詳細設計
 
-## 1. 役割
-Notion APIとの通信を担当する。ページの作成・更新、データベース情報の取得、レート制限対応、エラーハンドリングを行う。
+## 1. 概要
 
-## 2. 関数
+### 1.1 役割
+Notion APIとの通信を担当する静的クラス。ページの作成・更新、データベース情報の取得、レート制限対応、接続テスト、包括的なエラーハンドリングを行う。
 
-### 2.1 createPage(databaseId, pageData)
-**概要:** Notionデータベースに新しいページを作成
-**引数:**
-- `databaseId` (string): 対象データベースID
-- `pageData` (NotionPageData): ページデータ
-**戻り値:** `Promise<NotionPageResponse>`
+### 1.2 設計パターン
+- **静的クラス設計:** インスタンス化不要、グローバル状態管理
+- **レート制限管理:** 3リクエスト/秒の制限対応
+- **自動リトライ機能:** 指数バックオフによる堅牢性確保
+- **接続テスト機能:** 設定検証とトラブルシューティング支援
 
-```javascript
-async function createPage(databaseId, pageData) {
-  await this.rateLimiter.waitForRateLimit();
-  
-  const response = await this.makeRequest('/pages', {
-    method: 'POST',
-    payload: JSON.stringify({
-      parent: { database_id: databaseId },
-      properties: pageData.properties
-    })
-  });
-  
-  Logger.info('Page created successfully', { pageId: response.id });
-  return response;
-}
-```
+## 2. 主要メソッド
 
-### 2.2 updatePage(pageId, pageData)
-**概要:** 既存のNotionページを更新
-**引数:**
-- `pageId` (string): 更新対象ページID
-- `pageData` (NotionPageData): 更新データ
-**戻り値:** `Promise<NotionPageResponse>`
-
-```javascript
-async function updatePage(pageId, pageData) {
-  await this.rateLimiter.waitForRateLimit();
-  
-  const response = await this.makeRequest(`/pages/${pageId}`, {
-    method: 'PATCH',
-    payload: JSON.stringify({
-      properties: pageData.properties
-    })
-  });
-  
-  Logger.info('Page updated successfully', { pageId });
-  return response;
-}
-```
-
-### 2.3 getDatabaseInfo(databaseId)
-**概要:** データベースのプロパティ情報を取得
-**引数:**
-- `databaseId` (string): データベースID
-**戻り値:** `Promise<DatabaseInfo>`
-
-```javascript
-async function getDatabaseInfo(databaseId) {
-  await this.rateLimiter.waitForRateLimit();
-  
-  const response = await this.makeRequest(`/databases/${databaseId}`);
-  
-  return {
-    id: response.id,
-    title: response.title?.[0]?.plain_text || 'Untitled',
-    properties: Object.entries(response.properties).map(([name, prop]) => ({
-      name,
-      type: prop.type,
-      id: prop.id,
-      config: extractPropertyConfig(prop)
-    }))
-  };
-}
-```
-
-### 2.4 getPage(pageId)
-**概要:** 指定されたページの詳細情報を取得
-**引数:**
-- `pageId` (string): ページID
-**戻り値:** `Promise<NotionPageResponse>`
-
-```javascript
-async function getPage(pageId) {
-  await this.rateLimiter.waitForRateLimit();
-  
-  const response = await this.makeRequest(`/pages/${pageId}`);
-  
-  Logger.info('Page retrieved successfully', { pageId });
-  return response;
-}
-```
-
-### 2.5 makeRequest(endpoint, options)
-**概要:** Notion APIへのHTTPリクエストを実行
-**引数:**
-- `endpoint` (string): APIエンドポイント
-- `options` (RequestOptions): リクエストオプション
-**戻り値:** `Promise<any>`
-
-```javascript
-async function makeRequest(endpoint, options = {}) {
-  const url = `${CONSTANTS.NOTION.BASE_URL}${endpoint}`;
-  
-  const defaultOptions = {
-    method: 'GET',
-    headers: {
-      'Authorization': `Bearer ${ConfigManager.getApiToken()}`,
-      'Notion-Version': CONSTANTS.NOTION.API_VERSION,
-      'Content-Type': 'application/json'
-    },
-    muteHttpExceptions: true
-  };
-  
-  const requestOptions = { ...defaultOptions, ...options };
+### 2.1 createPage(databaseId: string, pageData: NotionPageData): Promise<NotionPageResponse>
+**概要:** Notionデータベースに新しいページを作成（レート制限・リトライ対応）
+```typescript
+static async createPage(databaseId: string, pageData: NotionPageData): Promise<NotionPageResponse> {
+  Logger.startTimer('NotionApiClient.createPage');
   
   try {
-    Logger.info('Making API request', { 
-      method: requestOptions.method, 
-      endpoint: endpoint 
+    await this.rateLimiter.waitForRateLimit();
+    
+    const response = await this.makeRequestWithRetry('/pages', {
+      method: 'POST',
+      payload: JSON.stringify({
+        parent: { database_id: databaseId },
+        properties: pageData.properties
+      })
     });
     
-    const response = UrlFetchApp.fetch(url, requestOptions);
-    const responseCode = response.getResponseCode();
-    const responseText = response.getContentText();
+    Logger.info('Page created successfully', { 
+      pageId: response.id,
+      databaseId 
+    });
     
-    if (responseCode >= 400) {
-      throw new ApiError(
-        `API request failed: ${responseCode}`,
-        responseCode,
-        responseText
-      );
-    }
-    
-    return JSON.parse(responseText);
-    
+    return response;
   } catch (error) {
-    if (error instanceof ApiError) {
-      throw error;
+    Logger.logError('NotionApiClient.createPage', error, { databaseId });
+    throw new NotionApiError(
+      `Failed to create page in database ${databaseId}`,
+      error as Error
+    );
+  } finally {
+    Logger.endTimer('NotionApiClient.createPage');
+  }
+}
+```
+
+### 2.2 updatePage(pageId: string, pageData: NotionPageData): Promise<NotionPageResponse>
+**概要:** 既存のNotionページを更新
+```typescript
+static async updatePage(pageId: string, pageData: NotionPageData): Promise<NotionPageResponse> {
+  Logger.startTimer('NotionApiClient.updatePage');
+  
+  try {
+    await this.rateLimiter.waitForRateLimit();
+    
+    const response = await this.makeRequestWithRetry(`/pages/${pageId}`, {
+      method: 'PATCH',
+      payload: JSON.stringify({
+        properties: pageData.properties
+      })
+    });
+    
+    Logger.info('Page updated successfully', { pageId });
+    return response;
+  } catch (error) {
+    Logger.logError('NotionApiClient.updatePage', error, { pageId });
+    throw new NotionApiError(
+      `Failed to update page ${pageId}`,
+      error as Error
+    );
+  } finally {
+    Logger.endTimer('NotionApiClient.updatePage');
+  }
+}
+```
+
+### 2.3 getDatabaseInfo(databaseId: string): Promise<DatabaseInfo>
+**概要:** データベースのプロパティ情報を取得（キャッシュ対応）
+```typescript
+static async getDatabaseInfo(databaseId: string): Promise<DatabaseInfo> {
+  Logger.startTimer('NotionApiClient.getDatabaseInfo');
+  
+  try {
+    // キャッシュチェック
+    const cached = this.databaseInfoCache.get(databaseId);
+    if (cached && (Date.now() - cached.timestamp) < CONSTANTS.CACHE.DATABASE_INFO_TTL) {
+      Logger.debug('Database info cache hit', { databaseId });
+      return cached.data;
     }
     
-    throw new ApiError('Network or parsing error', 0, error.message);
+    await this.rateLimiter.waitForRateLimit();
+    
+    const response = await this.makeRequestWithRetry(`/databases/${databaseId}`);
+    
+    const dbInfo: DatabaseInfo = {
+      id: response.id,
+      title: response.title?.[0]?.plain_text || 'Untitled',
+      properties: Object.entries(response.properties).map(([name, prop]: [string, any]) => ({
+        name,
+        type: prop.type,
+        id: prop.id,
+        config: this.extractPropertyConfig(prop)
+      }))
+    };
+    
+    // キャッシュに保存
+    this.databaseInfoCache.set(databaseId, {
+      data: dbInfo,
+      timestamp: Date.now()
+    });
+    
+    Logger.info('Database info retrieved', { 
+      databaseId, 
+      title: dbInfo.title,
+      propertyCount: dbInfo.properties.length 
+    });
+    
+    return dbInfo;
+  } catch (error) {
+    Logger.logError('NotionApiClient.getDatabaseInfo', error, { databaseId });
+    throw new NotionApiError(
+      `Failed to get database info for ${databaseId}`,
+      error as Error
+    );
+  } finally {
+    Logger.endTimer('NotionApiClient.getDatabaseInfo');
   }
 }
 ```
 
-### 2.6 extractPropertyConfig(property)
-**概要:** プロパティ設定情報を抽出
-**引数:**
-- `property` (any): Notionプロパティオブジェクト
-**戻り値:** `PropertyConfig`
-
-```javascript
-function extractPropertyConfig(property) {
-  const config = {
-    type: property.type,
-    required: false
-  };
+### 2.4 testConnection(): Promise<ConnectionTestResult>
+**概要:** API接続テストを実行（設定検証・トラブルシューティング）
+```typescript
+static async testConnection(): Promise<ConnectionTestResult> {
+  Logger.startTimer('NotionApiClient.testConnection');
   
-  switch (property.type) {
-    case 'select':
-      config.options = property.select?.options?.map(opt => ({
-        name: opt.name,
-        color: opt.color
-      })) || [];
-      break;
-      
-    case 'multi_select':
-      config.options = property.multi_select?.options?.map(opt => ({
-        name: opt.name,
-        color: opt.color
-      })) || [];
-      break;
-      
-    case 'date':
-      config.format = property.date?.format || null;
-      break;
-      
-    case 'number':
-      config.format = property.number?.format || 'number';
-      break;
-      
-    case 'formula':
-      config.expression = property.formula?.expression || '';
-      break;
-  }
-  
-  return config;
-}
-```
-
-### 2.7 testConnection()
-**概要:** API接続テストを実行
-**引数:** なし
-**戻り値:** `Promise<ConnectionTestResult>`
-
-```javascript
-async function testConnection() {
   try {
     const config = await ConfigManager.getConfig();
     
-    // データベース情報取得でテスト
-    const dbInfo = await getDatabaseInfo(config.databaseId);
+    // APIトークンの基本検証
+    if (!config.apiToken || config.apiToken.length < 10) {
+      return {
+        success: false,
+        error: 'Invalid API token format',
+        message: 'APIトークンが無効です'
+      };
+    }
+    
+    // データベースID検証
+    if (!config.databaseId || !config.databaseId.match(/^[a-f0-9-]{36}$/)) {
+      return {
+        success: false,
+        error: 'Invalid database ID format',
+        message: 'データベースIDが無効です'
+      };
+    }
+    
+    // 実際の接続テスト
+    const dbInfo = await this.getDatabaseInfo(config.databaseId);
     
     return {
       success: true,
@@ -213,83 +170,170 @@ async function testConnection() {
     };
     
   } catch (error) {
+    Logger.logError('NotionApiClient.testConnection', error);
+    
+    let errorMessage = '接続テストが失敗しました';
+    if (error instanceof NotionApiError) {
+      if (error.statusCode === 401) {
+        errorMessage = 'APIトークンが無効です';
+      } else if (error.statusCode === 404) {
+        errorMessage = 'データベースが見つかりません';
+      } else if (error.statusCode === 403) {
+        errorMessage = 'データベースへのアクセス権限がありません';
+      }
+    }
+    
     return {
       success: false,
-      error: error.message,
-      message: '接続テストが失敗しました'
+      error: error instanceof Error ? error.message : String(error),
+      message: errorMessage
     };
+  } finally {
+    Logger.endTimer('NotionApiClient.testConnection');
   }
 }
 ```
 
-### 2.8 queryDatabase(databaseId, filter, sorts)
-**概要:** データベースのクエリ実行
-**引数:**
-- `databaseId` (string): データベースID
-- `filter` (object, optional): フィルター条件
-- `sorts` (array, optional): ソート条件
-**戻り値:** `Promise<QueryResult>`
+### 2.5 makeRequestWithRetry(): Promise<any>
+**概要:** リトライ機能付きHTTPリクエスト実行
+```typescript
+private static async makeRequestWithRetry(
+  endpoint: string,
+  options: RequestOptions = {},
+  retryCount: number = 0
+): Promise<any> {
+  try {
+    return await this.makeRequest(endpoint, options);
+  } catch (error) {
+    if (retryCount >= CONSTANTS.NOTION.MAX_RETRIES) {
+      throw error;
+    }
+    
+    if (this.shouldRetry(error)) {
+      const delay = CONSTANTS.NOTION.RETRY_DELAYS[retryCount] || 4000;
+      Logger.info('Retrying API request', { 
+        endpoint, 
+        retryCount: retryCount + 1, 
+        delay 
+      });
+      
+      await this.sleep(delay);
+      return this.makeRequestWithRetry(endpoint, options, retryCount + 1);
+    }
+    
+    throw error;
+  }
+}
 
-```javascript
-async function queryDatabase(databaseId, filter = null, sorts = null) {
-  await this.rateLimiter.waitForRateLimit();
+private static shouldRetry(error: any): boolean {
+  if (error instanceof NotionApiError) {
+    // 429 (Rate Limited) または 5xx (Server Error) の場合はリトライ
+    return error.statusCode === 429 || error.statusCode >= 500;
+  }
   
-  const payload = {
-    page_size: 100
-  };
-  
-  if (filter) payload.filter = filter;
-  if (sorts) payload.sorts = sorts;
-  
-  const response = await this.makeRequest(`/databases/${databaseId}/query`, {
-    method: 'POST',
-    payload: JSON.stringify(payload)
-  });
-  
-  return {
-    results: response.results,
-    hasMore: response.has_more,
-    nextCursor: response.next_cursor
-  };
+  // ネットワークエラーの場合もリトライ
+  return error.message?.includes('network') || 
+         error.message?.includes('timeout') ||
+         error.message?.includes('DNS');
 }
 ```
 
-## 3. レート制限管理
+### 2.6 レート制限管理・ユーティリティメソッド
 
-### 3.1 RateLimiter クラス
-```javascript
-class RateLimiter {
-  constructor() {
-    this.lastRequestTime = 0;
-    this.minInterval = CONSTANTS.NOTION.RATE_LIMIT_DELAY; // 334ms
-    this.requestQueue = [];
-  }
+#### RateLimiter管理
+```typescript
+private static rateLimiter = {
+  lastRequestTime: 0,
+  minInterval: CONSTANTS.NOTION.RATE_LIMIT_DELAY, // 334ms (3 req/s)
   
-  async waitForRateLimit() {
+  async waitForRateLimit(): Promise<void> {
     const now = Date.now();
     const timeSinceLastRequest = now - this.lastRequestTime;
     
     if (timeSinceLastRequest < this.minInterval) {
       const waitTime = this.minInterval - timeSinceLastRequest;
       Logger.debug('Rate limit wait', { waitTime });
-      await this.sleep(waitTime);
+      await NotionApiClient.sleep(waitTime);
     }
     
     this.lastRequestTime = Date.now();
-  }
+  },
   
-  sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
-  
-  reset() {
+  reset(): void {
     this.lastRequestTime = 0;
-    this.requestQueue = [];
   }
+};
+```
+
+#### extractPropertyConfig(property: any): PropertyConfig
+```typescript
+private static extractPropertyConfig(property: any): PropertyConfig {
+  const config: PropertyConfig = {
+    type: property.type,
+    required: false
+  };
+  
+  try {
+    switch (property.type) {
+      case CONSTANTS.DATA_TYPES.SELECT:
+        config.options = property.select?.options?.map((opt: any) => ({
+          name: opt.name,
+          color: opt.color,
+          id: opt.id
+        })) || [];
+        break;
+        
+      case CONSTANTS.DATA_TYPES.MULTI_SELECT:
+        config.options = property.multi_select?.options?.map((opt: any) => ({
+          name: opt.name,
+          color: opt.color,
+          id: opt.id
+        })) || [];
+        break;
+        
+      case CONSTANTS.DATA_TYPES.DATE:
+        config.format = property.date?.format || null;
+        break;
+        
+      case CONSTANTS.DATA_TYPES.NUMBER:
+        config.format = property.number?.format || 'number';
+        break;
+        
+      case 'formula':
+        config.expression = property.formula?.expression || '';
+        config.return_type = property.formula?.return_type || 'string';
+        break;
+        
+      case 'relation':
+        config.database_id = property.relation?.database_id;
+        config.synced_property_name = property.relation?.synced_property_name;
+        break;
+        
+      case 'rollup':
+        config.relation_property_name = property.rollup?.relation_property_name;
+        config.relation_property_id = property.rollup?.relation_property_id;
+        config.rollup_property_name = property.rollup?.rollup_property_name;
+        config.rollup_property_id = property.rollup?.rollup_property_id;
+        config.function = property.rollup?.function;
+        break;
+    }
+  } catch (error) {
+    Logger.logWarning('NotionApiClient.extractPropertyConfig', 
+      `Failed to extract config for property type: ${property.type}`, error);
+  }
+  
+  return config;
 }
 ```
 
-## 4. データ構造
+#### sleep(ms: number): Promise<void>
+```typescript
+private static sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+```
+
+## 3. 型定義
 
 ```typescript
 interface NotionPageResponse {
@@ -320,9 +364,17 @@ interface DatabaseInfo {
 interface PropertyConfig {
   type: string;
   required: boolean;
-  options?: Array<{ name: string; color: string }>;
+  options?: Array<{ name: string; color: string; id: string }>;
   format?: string;
   expression?: string;
+  return_type?: string;
+  database_id?: string;
+  synced_property_name?: string;
+  relation_property_name?: string;
+  relation_property_id?: string;
+  rollup_property_name?: string;
+  rollup_property_id?: string;
+  function?: string;
 }
 
 interface ConnectionTestResult {
@@ -333,12 +385,6 @@ interface ConnectionTestResult {
   message: string;
 }
 
-interface QueryResult {
-  results: NotionPageResponse[];
-  hasMore: boolean;
-  nextCursor?: string;
-}
-
 interface RequestOptions {
   method?: string;
   headers?: Record<string, string>;
@@ -346,129 +392,96 @@ interface RequestOptions {
   muteHttpExceptions?: boolean;
 }
 
-class ApiError extends Error {
+class NotionApiError extends Error {
   constructor(
-    message: string, 
-    public statusCode: number, 
-    public responseBody: string
+    message: string,
+    public cause?: Error,
+    public statusCode?: number,
+    public responseBody?: string
   ) {
     super(message);
-    this.name = 'ApiError';
+    this.name = 'NotionApiError';
   }
 }
 ```
 
-## 5. プロパティ/変数
+## 4. エラーハンドリング
 
-```javascript
-const NOTION_API_CLIENT = {
-  // レート制限管理
-  rateLimiter: new RateLimiter(),
-  
-  // リトライ設定
-  MAX_RETRIES: 3,
-  RETRY_DELAYS: [1000, 2000, 4000], // 指数バックオフ
-  
-  // タイムアウト設定
-  REQUEST_TIMEOUT: 30000, // 30秒
-  
-  // サポートAPIバージョン
-  SUPPORTED_API_VERSIONS: ['2022-06-28', '2022-02-22'],
-  
-  // HTTPステータスコード
-  HTTP_STATUS: {
-    OK: 200,
-    CREATED: 201,
-    BAD_REQUEST: 400,
-    UNAUTHORIZED: 401,
-    FORBIDDEN: 403,
-    NOT_FOUND: 404,
-    RATE_LIMITED: 429,
-    INTERNAL_ERROR: 500
-  }
-};
-```
-
-## 6. エラーハンドリング
-
-### 6.1 処理可能なエラー
-- 認証エラー（401 Unauthorized）
-- 権限エラー（403 Forbidden）
-- リソース不存在（404 Not Found）
-- レート制限（429 Too Many Requests）
-- サーバーエラー（500 Internal Server Error）
-
-### 6.2 リトライ機能
-```javascript
-async function makeRequestWithRetry(endpoint, options = {}, retryCount = 0) {
-  try {
-    return await this.makeRequest(endpoint, options);
-  } catch (error) {
-    if (retryCount >= this.MAX_RETRIES) {
-      throw error;
-    }
-    
-    if (this.shouldRetry(error)) {
-      const delay = this.RETRY_DELAYS[retryCount] || 4000;
-      Logger.info('Retrying request', { 
-        endpoint, 
-        retryCount: retryCount + 1, 
-        delay 
-      });
-      
-      await this.sleep(delay);
-      return this.makeRequestWithRetry(endpoint, options, retryCount + 1);
-    }
-    
-    throw error;
+### 4.1 NotionApiError
+```typescript
+class NotionApiError extends Error {
+  constructor(
+    message: string,
+    public cause?: Error,
+    public statusCode?: number,
+    public responseBody?: string
+  ) {
+    super(message);
+    this.name = 'NotionApiError';
   }
 }
-
-function shouldRetry(error) {
-  if (error instanceof ApiError) {
-    // 429 (Rate Limited) または 5xx (Server Error) の場合はリトライ
-    return error.statusCode === 429 || error.statusCode >= 500;
-  }
-  
-  // ネットワークエラーの場合もリトライ
-  return error.message?.includes('network') || 
-         error.message?.includes('timeout');
-}
 ```
+
+### 4.2 HTTPステータスコード対応
+- **200 OK:** 正常レスポンス
+- **201 Created:** ページ作成成功
+- **400 Bad Request:** リクエスト形式エラー
+- **401 Unauthorized:** 認証エラー（APIトークン無効）
+- **403 Forbidden:** 権限エラー（データベースアクセス不可）
+- **404 Not Found:** リソース不存在（データベース・ページ）
+- **429 Too Many Requests:** レート制限（自動リトライ）
+- **500 Internal Server Error:** サーバーエラー（自動リトライ）
+
+### 4.3 リトライ戦略
+- **対象エラー:** 429, 5xx, ネットワークエラー
+- **リトライ回数:** 最大3回
+- **待機時間:** 指数バックオフ (1s, 2s, 4s)
+
+## 5. パフォーマンス特性
+
+### 5.1 レート制限対応
+- **制限:** 3リクエスト/秒
+- **実装:** 334ms間隔での自動制御
+- **効果:** API制限エラーの回避
+
+### 5.2 キャッシュ戦略
+- **DatabaseInfo:** 5分間キャッシュ
+- **メモリ効率:** Map構造による軽量キャッシュ
+- **一貫性:** TTL管理による適切な更新
+
+## 6. テスト戦略
+
+### 6.1 単体テスト (NotionApiClient.test.ts)
+- API通信テスト（モック使用）
+- エラーハンドリングテスト
+- レート制限テスト
+- キャッシュ機能テスト
+
+### 6.2 統合テスト
+- 実Notion API接続テスト
+- 大量データ処理テスト
+- 長時間実行安定性テスト
 
 ## 7. セキュリティ考慮事項
 
 ### 7.1 認証情報管理
-- APIトークンはリクエストヘッダーで送信
-- ログ出力時はトークンをマスク
-- 不正なトークンの検出と適切なエラー処理
+- APIトークンの安全な取得・使用
+- ログ出力時のトークンマスク
+- 不正認証の適切な検出・処理
 
-### 7.2 データ保護
+### 7.2 通信セキュリティ
 - HTTPS通信の強制
-- レスポンスデータの適切な処理
 - 機密情報のログ出力防止
+- レスポンスデータの適切な処理
 
-## 8. 依存関係
+## 8. 関連モジュール
 
-### 8.1 依存モジュール
-- ConfigManager: API認証情報の取得
-- Logger: ログ出力
-- Constants: 定数定義
+### 8.1 依存関係
+- **ConfigManager:** API認証情報・設定取得
+- **Logger:** 処理ログ・パフォーマンス計測
+- **Constants:** API定数・エンドポイント定義
+- **types/index.ts:** 型定義
 
-### 8.2 外部依存
-- UrlFetchApp: HTTP通信
-- JSON: データ変換
-- setTimeout: 遅延処理
-
-## 9. テスト観点
-
-### 9.1 単体テスト項目
-- 正常なAPI呼び出し
-- 各種エラーステータスの処理
-- レート制限の動作
-- リトライ機能
-
-### 9.2 統合テスト項目
-- 実際のNotion APIとの通信
-- 大量データの処理性能
-- 長時間実行時の安定性
+### 8.2 使用箇所
+- **TriggerManager:** Notion API操作の実行
+- **統合テスト:** API通信テスト

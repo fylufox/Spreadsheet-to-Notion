@@ -1,99 +1,245 @@
 # DataMapper モジュール詳細設計
 
-## 1. 役割
-スプレッドシートのデータをNotion API形式に変換する。データ型の変換、プロパティのマッピング、フォーマット調整を行う。
+## 1. 役割・概要
+**DataMapper** は、静的クラス設計によるデータ変換の中核モジュールです。スプレッドシートデータとNotion API形式間の双方向変換、厳密な型安全性、Validator連携によるデータ整合性確保を提供します。
 
-## 2. 関数
+### 設計方針
+- **Static Class Pattern**: ステートレス変換処理・テスト容易性
+- **Type Safety**: TypeScript厳密型定義による変換安全性
+- **Validator Integration**: 事前検証による変換品質保証
+- **Performance Optimization**: タイマー機能・エラー詳細化
 
-### 2.1 mapToNotionFormat(rowData, mappings)
-**概要:** スプレッドシートデータをNotion形式に変換
+## 2. クラス構造
+
+### 2.1 クラス定義
+```typescript
+export class DataMapper {
+  // 主要変換メソッド
+  static mapRowToNotionPage(rowData: any[], mappings: ColumnMapping[]): NotionPageData;
+  static mapNotionPageToRow(notionPage: NotionPageResponse, mappings: ColumnMapping[]): any[];
+  
+  // プロパティ変換
+  private static convertToNotionProperty(value: any, dataType: string): NotionProperty | null;
+  private static convertFromNotionProperty(property: NotionProperty, dataType: string): any;
+  
+  // ユーティリティ
+  private static getColumnIndex(columnName: string): number;
+  private static formatDateForNotion(value: any): string;
+  private static isEmptyValue(value: any): boolean;
+  private static validateRowNumber(rowNumber: number): void;
+}
+
+```
+
+## 2. 主要メソッド
+
+### 2.1 mapRowToNotionPage(rowData: any[], mappings: ColumnMapping[]): NotionPageData
+**概要:** スプレッドシート行データをNotionページ形式に変換（Validator連携）
 **引数:**
-- `rowData` (Array): スプレッドシートの行データ
-- `mappings` (Array<ColumnMapping>): カラムマッピング情報
-**戻り値:** `NotionPageData`
+- `rowData` (any[]): スプレッドシートの行データ
+- `mappings` (ColumnMapping[]): カラムマッピング情報
+**戻り値:** NotionPageData
+**特徴:** 事前検証、詳細エラー、パフォーマンス計測
 
-```javascript
-function mapToNotionFormat(rowData, mappings) {
-  const properties = {};
+```typescript
+static mapRowToNotionPage(rowData: any[], mappings: ColumnMapping[]): NotionPageData {
+  Logger.startTimer('DataMapper.mapRowToNotionPage');
   
-  mappings.forEach((mapping, index) => {
-    if (!mapping.isTarget) return;
+  try {
+    // 入力データの事前検証
+    const validationResult = Validator.validateRowData(rowData, mappings);
+    if (!validationResult.valid) {
+      throw new MappingError(
+        `Row ${rowNumber} validation failed: ${validationResult.errors.join(', ')}`
+      );
+    }
+
+    const properties: Record<string, NotionProperty> = {};
     
-    const value = rowData[index + CONSTANTS.COLUMNS.DATA_START - 1];
-    const notionProperty = convertToNotionProperty(value, mapping.dataType);
-    
-    properties[mapping.notionPropertyName] = notionProperty;
-  });
-  
-  return { properties };
+    // 対象マッピングの処理
+    mappings.forEach(mapping => {
+      if (!mapping.isTarget) return;
+      
+      try {
+        const columnIndex = this.getColumnIndex(mapping.spreadsheetColumn);
+        const value = rowData[columnIndex];
+        
+        // 空値チェック
+        if (this.isEmptyValue(value) && !mapping.isRequired) {
+          return; // 空値は設定しない
+        }
+        
+        // Notion形式に変換
+        const notionProperty = this.convertToNotionProperty(value, mapping.dataType);
+        if (notionProperty !== null) {
+          properties[mapping.notionPropertyName] = notionProperty;
+        }
+      } catch (error) {
+        throw new MappingError(
+          `Failed to map column '${mapping.spreadsheetColumn}' to '${mapping.notionPropertyName}'`,
+          error as Error,
+          { mapping, value: rowData[this.getColumnIndex(mapping.spreadsheetColumn)] }
+        );
+      }
+    });
+
+    Logger.debug('Data mapping completed', {
+      mappedProperties: Object.keys(properties).length,
+      totalMappings: mappings.filter(m => m.isTarget).length
+    });
+
+    return { properties };
+  } catch (error) {
+    Logger.logError('DataMapper.mapRowToNotionPage', error);
+    throw error;
+  } finally {
+    Logger.endTimer('DataMapper.mapRowToNotionPage');
+  }
 }
 ```
 
-### 2.2 convertToNotionProperty(value, dataType)
-**概要:** 値をNotionプロパティ形式に変換
-**引数:**
-- `value` (any): 変換対象の値
-- `dataType` (string): Notionプロパティタイプ
-**戻り値:** `NotionProperty`
+### 2.2 convertToNotionProperty(value: any, dataType: string): NotionProperty | null
+**概要:** 型安全なNotionプロパティ変換
+**特徴:** 厳密な型チェック、null安全、詳細エラー
 
-```javascript
-function convertToNotionProperty(value, dataType) {
-  if (value === null || value === undefined || value === '') {
+```typescript
+private static convertToNotionProperty(value: any, dataType: string): NotionProperty | null {
+  // 空値処理
+  if (this.isEmptyValue(value)) {
     return null;
   }
   
-  switch (dataType) {
-    case 'title':
-      return { title: [{ text: { content: String(value) } }] };
-      
-    case 'rich_text':
-      return { rich_text: [{ text: { content: String(value) } }] };
-      
-    case 'number':
-      return { number: parseFloat(value) || 0 };
-      
-    case 'select':
-      return { select: { name: String(value) } };
-      
-    case 'multi_select':
-      const values = String(value).split(',').map(v => v.trim());
-      return { multi_select: values.map(v => ({ name: v })) };
-      
-    case 'date':
-      return { date: { start: formatDateForNotion(value) } };
-      
-    case 'checkbox':
-      return { checkbox: Boolean(value) };
-      
-    case 'url':
-      return { url: String(value) };
-      
-    case 'email':
-      return { email: String(value) };
-      
-    case 'phone_number':
-      return { phone_number: String(value) };
-      
-    default:
-      throw new Error(`Unsupported data type: ${dataType}`);
+  try {
+    switch (dataType) {
+      case CONSTANTS.DATA_TYPES.TITLE:
+        return {
+          type: 'title',
+          title: [{ text: { content: String(value) } }]
+        };
+        
+      case CONSTANTS.DATA_TYPES.RICH_TEXT:
+        return {
+          type: 'rich_text',
+          rich_text: [{ text: { content: String(value) } }]
+        };
+        
+      case CONSTANTS.DATA_TYPES.NUMBER:
+        const numValue = Number(value);
+        if (isNaN(numValue)) {
+          throw new Error(`Cannot convert '${value}' to number`);
+        }
+        return {
+          type: 'number',
+          number: numValue
+        };
+        
+      case CONSTANTS.DATA_TYPES.SELECT:
+        return {
+          type: 'select',
+          select: { name: String(value).trim() }
+        };
+        
+      case CONSTANTS.DATA_TYPES.MULTI_SELECT:
+        const items = String(value)
+          .split(',')
+          .map(item => item.trim())
+          .filter(item => item.length > 0);
+        return {
+          type: 'multi_select',
+          multi_select: items.map(item => ({ name: item }))
+        };
+        
+      case CONSTANTS.DATA_TYPES.DATE:
+        return {
+          type: 'date',
+          date: { start: this.formatDateForNotion(value) }
+        };
+        
+      case CONSTANTS.DATA_TYPES.CHECKBOX:
+        return {
+          type: 'checkbox',
+          checkbox: Boolean(value)
+        };
+        
+      case CONSTANTS.DATA_TYPES.URL:
+        const urlValue = String(value).trim();
+        if (urlValue && !urlValue.match(/^https?:\/\//)) {
+          throw new Error(`Invalid URL format: ${urlValue}`);
+        }
+        return {
+          type: 'url',
+          url: urlValue || null
+        };
+        
+      case CONSTANTS.DATA_TYPES.EMAIL:
+        const emailValue = String(value).trim();
+        if (emailValue && !emailValue.includes('@')) {
+          throw new Error(`Invalid email format: ${emailValue}`);
+        }
+        return {
+          type: 'email',
+          email: emailValue || null
+        };
+        
+      case CONSTANTS.DATA_TYPES.PHONE_NUMBER:
+        return {
+          type: 'phone_number',
+          phone_number: String(value).trim() || null
+        };
+        
+      default:
+        throw new Error(`Unsupported data type: ${dataType}`);
+    }
+  } catch (error) {
+    throw new Error(`Type conversion failed for '${dataType}': ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 ```
 
-### 2.3 formatDateForNotion(value)
-**概要:** 日付値をNotion API形式に変換
-**引数:**
-- `value` (any): 日付値（Date, 文字列, 数値）
-**戻り値:** `string` (ISO 8601形式)
+### 2.3 mapNotionPageToRow(notionPage: NotionPageResponse, mappings: ColumnMapping[]): any[]
+**概要:** Notionページからスプレッドシート行への逆変換
+```typescript
+static mapNotionPageToRow(notionPage: NotionPageResponse, mappings: ColumnMapping[]): any[] {
+  Logger.startTimer('DataMapper.mapNotionPageToRow');
+  
+  try {
+    const maxColumnIndex = Math.max(
+      ...mappings.map(m => this.getColumnIndex(m.spreadsheetColumn))
+    );
+    const rowData = new Array(maxColumnIndex + 1).fill('');
+    
+    // 主キー設定
+    rowData[CONSTANTS.COLUMNS.PRIMARY_KEY - 1] = notionPage.id;
+    
+    // マッピング処理
+    mappings.forEach(mapping => {
+      if (!mapping.isTarget) return;
+      
+      const property = notionPage.properties[mapping.notionPropertyName];
+      if (property) {
+        const columnIndex = this.getColumnIndex(mapping.spreadsheetColumn);
+        rowData[columnIndex] = this.convertFromNotionProperty(property, mapping.dataType);
+      }
+    });
+    
+    return rowData;
+  } finally {
+    Logger.endTimer('DataMapper.mapNotionPageToRow');
+  }
+}
+```
 
-```javascript
-function formatDateForNotion(value) {
-  let date;
+### 2.4 日付変換・ユーティリティメソッド
+
+#### formatDateForNotion(value: any): string
+```typescript
+private static formatDateForNotion(value: any): string {
+  let date: Date;
   
   if (value instanceof Date) {
     date = value;
   } else if (typeof value === 'number') {
-    // Excelのシリアル値から変換
+    // Excelシリアル値対応
     date = new Date((value - 25569) * 86400 * 1000);
   } else if (typeof value === 'string') {
     date = new Date(value);
@@ -105,307 +251,199 @@ function formatDateForNotion(value) {
     throw new Error(`Invalid date value: ${value}`);
   }
   
-  // ISO 8601形式で返却（YYYY-MM-DD）
+  // ISO 8601形式 (YYYY-MM-DD)
   return date.toISOString().split('T')[0];
 }
 ```
 
-### 2.4 mapFromNotionFormat(notionPage, mappings)
-**概要:** Notionページデータをスプレッドシート形式に逆変換
-**引数:**
-- `notionPage` (NotionPage): Notionページデータ
-- `mappings` (Array<ColumnMapping>): カラムマッピング情報
-**戻り値:** `Array<any>` (スプレッドシート行データ)
-
-```javascript
-function mapFromNotionFormat(notionPage, mappings) {
-  const rowData = new Array(mappings.length + CONSTANTS.COLUMNS.DATA_START - 1);
+#### getColumnIndex(columnName: string): number
+```typescript
+private static getColumnIndex(columnName: string): number {
+  // A=0, B=1, C=2, ... の形式でインデックス計算
+  if (!/^[A-Z]+$/.test(columnName)) {
+    throw new Error(`Invalid column name format: ${columnName}`);
+  }
   
-  // 主キー設定
-  rowData[CONSTANTS.COLUMNS.PRIMARY_KEY - 1] = notionPage.id;
-  
-  mappings.forEach((mapping, index) => {
-    if (!mapping.isTarget) return;
-    
-    const notionProperty = notionPage.properties[mapping.notionPropertyName];
-    const value = convertFromNotionProperty(notionProperty, mapping.dataType);
-    
-    rowData[index + CONSTANTS.COLUMNS.DATA_START - 1] = value;
-  });
-  
-  return rowData;
+  let index = 0;
+  for (let i = 0; i < columnName.length; i++) {
+    index = index * 26 + (columnName.charCodeAt(i) - 'A'.charCodeAt(0) + 1);
+  }
+  return index - 1; // 0-based index
 }
 ```
 
-### 2.5 convertFromNotionProperty(notionProperty, dataType)
-**概要:** Notionプロパティをスプレッドシート値に変換
-**引数:**
-- `notionProperty` (NotionProperty): Notionプロパティデータ
-- `dataType` (string): プロパティタイプ
-**戻り値:** `any`
+#### isEmptyValue(value: any): boolean
+```typescript
+private static isEmptyValue(value: any): boolean {
+  return value === null || 
+         value === undefined || 
+         value === '' || 
+         value === 'null' || 
+         value === 'undefined';
+}
+```
 
-```javascript
-function convertFromNotionProperty(notionProperty, dataType) {
-  if (!notionProperty) return '';
+#### convertFromNotionProperty(property: NotionProperty, dataType: string): any
+```typescript
+private static convertFromNotionProperty(property: NotionProperty, dataType: string): any {
+  if (!property) return '';
   
-  switch (dataType) {
-    case 'title':
-      return notionProperty.title?.[0]?.text?.content || '';
-      
-    case 'rich_text':
-      return notionProperty.rich_text?.[0]?.text?.content || '';
-      
-    case 'number':
-      return notionProperty.number || 0;
-      
-    case 'select':
-      return notionProperty.select?.name || '';
-      
-    case 'multi_select':
-      return notionProperty.multi_select?.map(item => item.name).join(', ') || '';
-      
-    case 'date':
-      return notionProperty.date?.start || '';
-      
-    case 'checkbox':
-      return notionProperty.checkbox || false;
-      
-    case 'url':
-      return notionProperty.url || '';
-      
-    case 'email':
-      return notionProperty.email || '';
-      
-    case 'phone_number':
-      return notionProperty.phone_number || '';
-      
-    default:
-      return '';
+  try {
+    switch (dataType) {
+      case CONSTANTS.DATA_TYPES.TITLE:
+        return property.type === 'title' && property.title?.[0]?.text?.content || '';
+        
+      case CONSTANTS.DATA_TYPES.RICH_TEXT:
+        return property.type === 'rich_text' && property.rich_text?.[0]?.text?.content || '';
+        
+      case CONSTANTS.DATA_TYPES.NUMBER:
+        return property.type === 'number' ? property.number || 0 : '';
+        
+      case CONSTANTS.DATA_TYPES.SELECT:
+        return property.type === 'select' && property.select?.name || '';
+        
+      case CONSTANTS.DATA_TYPES.MULTI_SELECT:
+        return property.type === 'multi_select' 
+          ? property.multi_select?.map(item => item.name).join(', ') || ''
+          : '';
+        
+      case CONSTANTS.DATA_TYPES.DATE:
+        return property.type === 'date' && property.date?.start || '';
+        
+      case CONSTANTS.DATA_TYPES.CHECKBOX:
+        return property.type === 'checkbox' ? property.checkbox || false : false;
+        
+      case CONSTANTS.DATA_TYPES.URL:
+        return property.type === 'url' && property.url || '';
+        
+      case CONSTANTS.DATA_TYPES.EMAIL:
+        return property.type === 'email' && property.email || '';
+        
+      case CONSTANTS.DATA_TYPES.PHONE_NUMBER:
+        return property.type === 'phone_number' && property.phone_number || '';
+        
+      default:
+        Logger.logWarning('DataMapper.convertFromNotionProperty', `Unsupported data type: ${dataType}`);
+        return '';
+    }
+  } catch (error) {
+    Logger.logError('DataMapper.convertFromNotionProperty', error, { dataType, property });
+    return '';
   }
 }
 ```
 
-### 2.6 validateMapping(mappings)
-**概要:** カラムマッピング設定の検証
-**引数:**
-- `mappings` (Array<ColumnMapping>): 検証対象マッピング
-**戻り値:** `ValidationResult`
-
-```javascript
-function validateMapping(mappings) {
-  const errors = [];
-  const usedNotionProperties = new Set();
-  let hasTitleProperty = false;
-  
-  mappings.forEach((mapping, index) => {
-    if (!mapping.isTarget) return;
-    
-    // 必須項目チェック
-    if (!mapping.notionPropertyName) {
-      errors.push(`行${index + 2}: Notionプロパティ名が指定されていません`);
-      return;
-    }
-    
-    if (!mapping.dataType) {
-      errors.push(`行${index + 2}: データ型が指定されていません`);
-      return;
-    }
-    
-    // 重複チェック
-    if (usedNotionProperties.has(mapping.notionPropertyName)) {
-      errors.push(`行${index + 2}: Notionプロパティ名 '${mapping.notionPropertyName}' が重複しています`);
-    }
-    usedNotionProperties.add(mapping.notionPropertyName);
-    
-    // Titleプロパティチェック
-    if (mapping.dataType === 'title') {
-      if (hasTitleProperty) {
-        errors.push(`行${index + 2}: Titleプロパティは1つのみ設定可能です`);
-      }
-      hasTitleProperty = true;
-    }
-    
-    // サポート対象データ型チェック
-    const supportedTypes = [
-      'title', 'rich_text', 'number', 'select', 'multi_select',
-      'date', 'checkbox', 'url', 'email', 'phone_number'
-    ];
-    
-    if (!supportedTypes.includes(mapping.dataType)) {
-      errors.push(`行${index + 2}: サポートされていないデータ型です: ${mapping.dataType}`);
-    }
-  });
-  
-  // Titleプロパティの存在チェック
-  if (!hasTitleProperty) {
-    errors.push('Titleプロパティが設定されていません。少なくとも1つのTitleプロパティが必要です。');
-  }
-  
-  if (errors.length > 0) {
-    throw new ValidationError('カラムマッピング検証エラー', errors);
-  }
-  
-  return { valid: true, errors: [] };
-}
-```
-
-### 2.7 getDataTypeInfo(dataType)
-**概要:** データ型の詳細情報を取得
-**引数:**
-- `dataType` (string): データ型
-**戻り値:** `DataTypeInfo`
-
-```javascript
-function getDataTypeInfo(dataType) {
-  const dataTypeMap = {
-    'title': {
-      name: 'タイトル',
-      description: 'ページのタイトル（必須、1つのみ）',
-      example: 'ページタイトル',
-      validation: 'テキスト形式'
-    },
-    'rich_text': {
-      name: 'リッチテキスト',
-      description: '複数行のテキスト',
-      example: '詳細な説明文',
-      validation: 'テキスト形式'
-    },
-    'number': {
-      name: '数値',
-      description: '数値データ',
-      example: '123.45',
-      validation: '数値形式'
-    },
-    'select': {
-      name: 'セレクト',
-      description: '単一選択',
-      example: 'オプション1',
-      validation: 'テキスト形式（選択肢と一致）'
-    },
-    'multi_select': {
-      name: 'マルチセレクト',
-      description: '複数選択',
-      example: 'オプション1, オプション2',
-      validation: 'カンマ区切りテキスト'
-    },
-    'date': {
-      name: '日付',
-      description: '日付データ',
-      example: '2025-08-10',
-      validation: '日付形式（YYYY-MM-DD）'
-    },
-    'checkbox': {
-      name: 'チェックボックス',
-      description: 'true/false',
-      example: 'TRUE',
-      validation: 'ブール値'
-    },
-    'url': {
-      name: 'URL',
-      description: 'ウェブサイトのURL',
-      example: 'https://example.com',
-      validation: 'URL形式'
-    },
-    'email': {
-      name: 'メール',
-      description: 'メールアドレス',
-      example: 'user@example.com',
-      validation: 'メール形式'
-    },
-    'phone_number': {
-      name: '電話番号',
-      description: '電話番号',
-      example: '090-1234-5678',
-      validation: 'テキスト形式'
-    }
-  };
-  
-  return dataTypeMap[dataType] || {
-    name: 'Unknown',
-    description: 'サポートされていないデータ型',
-    example: '',
-    validation: ''
-  };
-}
-```
-
-## 3. データ構造
+## 3. 型定義
 
 ```typescript
+interface ColumnMapping {
+  spreadsheetColumn: string;      // A, B, C, ...
+  notionPropertyName: string;     // Notionプロパティ名
+  dataType: string;              // title, rich_text, number, etc.
+  isTarget: boolean;             // 対象フラグ
+  isRequired?: boolean;          // 必須フラグ
+}
+
 interface NotionPageData {
   properties: Record<string, NotionProperty>;
 }
 
 interface NotionProperty {
-  title?: Array<{ text: { content: string } }>;
-  rich_text?: Array<{ text: { content: string } }>;
-  number?: number;
-  select?: { name: string };
-  multi_select?: Array<{ name: string }>;
-  date?: { start: string; end?: string };
-  checkbox?: boolean;
-  url?: string;
-  email?: string;
-  phone_number?: string;
+  type: string;
+  // 各プロパティ型の詳細は省略
+  [key: string]: any;
 }
 
-interface NotionPage {
+interface NotionPageResponse {
   id: string;
   created_time: string;
   last_edited_time: string;
   properties: Record<string, NotionProperty>;
 }
 
-interface DataTypeInfo {
-  name: string;
-  description: string;
-  example: string;
-  validation: string;
+interface MappingContext {
+  mapping: ColumnMapping;
+  value: any;
+  rowIndex?: number;
 }
+```
 
-interface ValidationResult {
-  valid: boolean;
-  errors: string[];
-}
+## 4. エラーハンドリング
 
-class ValidationError extends Error {
-  constructor(message: string, public errors: string[]) {
+### 4.1 MappingError
+```typescript
+class MappingError extends Error {
+  constructor(
+    message: string,
+    public cause?: Error,
+    public context?: MappingContext
+  ) {
     super(message);
-    this.name = 'ValidationError';
+    this.name = 'MappingError';
   }
 }
 ```
 
-## 4. プロパティ/変数
+### 4.2 エラーパターン
+- **型変換エラー:** 無効な数値・日付・URL・メール形式
+- **マッピング設定エラー:** 無効なカラム名・重複プロパティ名
+- **検証エラー:** 必須フィールド未設定・サポート外データ型
+- **データ整合性エラー:** 主キー不一致・データ型不整合
 
-```javascript
-const DATA_MAPPER = {
-  // サポートされているデータ型
-  SUPPORTED_DATA_TYPES: [
-    'title', 'rich_text', 'number', 'select', 'multi_select',
-    'date', 'checkbox', 'url', 'email', 'phone_number'
-  ],
-  
-  // 日付フォーマット設定
-  DATE_FORMATS: {
-    INPUT: ['YYYY-MM-DD', 'MM/DD/YYYY', 'DD/MM/YYYY'],
-    OUTPUT: 'YYYY-MM-DD'
-  },
-  
-  // マルチセレクトの区切り文字
-  MULTI_SELECT_DELIMITER: ',',
-  
-  // 空値として扱う値
-  EMPTY_VALUES: [null, undefined, '', 'null', 'undefined']
-};
-```
+## 5. パフォーマンス特性
 
-## 5. エラーハンドリング
+### 5.1 計算量
+- mapRowToNotionPage: O(n) (nはマッピング数)
+- mapNotionPageToRow: O(n) (nはマッピング数)
+- 大量データ処理時のバッチ最適化対応
 
-### 5.1 処理可能なエラー
-- データ型変換エラー（TYPE_CONVERSION_ERROR）
-- 日付フォーマットエラー（DATE_FORMAT_ERROR）
-- マッピング設定エラー（MAPPING_CONFIG_ERROR）
+### 5.2 メモリ使用量
+- 静的メソッドによる低メモリフットプリント
+- 一時オブジェクト生成の最小化
+- ガベージコレクション配慮
+
+## 6. テスト戦略
+
+### 6.1 単体テスト (DataMapper.test.ts)
+- データ型変換テスト（全11種類）
+- エラーハンドリングテスト
+- 境界値・異常値テスト
+- パフォーマンステスト
+
+### 6.2 統合テスト
+- スプレッドシート連携テスト
+- Notion API連携テスト
+- 双方向変換整合性テスト
+
+## 7. 設計考慮事項
+
+### 7.1 型安全性
+- TypeScript strict mode対応
+- null安全な実装
+- 型ガードによる実行時検証
+
+### 7.2 拡張性
+- 新データ型の追加容易性
+- カスタム変換ロジックの挿入ポイント
+- 設定ベースのマッピング制御
+
+### 7.3 保守性
+- 関数分離による責務明確化
+- 詳細なログ・エラー情報
+- 包括的なユニットテスト
+
+## 8. 関連モジュール
+
+### 8.1 依存関係
+- **Validator:** 入力データ検証
+- **Logger:** 処理ログ・パフォーマンス計測
+- **Constants:** データ型定数・カラム定義
+- **types/index.ts:** 型定義
+
+### 8.2 使用箇所
+- **TriggerManager:** データ同期処理
+- **NotionApiClient:** API送信データ作成
+- **統合テスト:** データ整合性検証
 - 必須プロパティ欠損（REQUIRED_PROPERTY_MISSING）
 
 ### 5.2 エラー処理方針

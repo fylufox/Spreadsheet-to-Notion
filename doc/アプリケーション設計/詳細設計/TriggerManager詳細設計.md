@@ -1,216 +1,418 @@
 # TriggerManager モジュール詳細設計
 
-## 1. 役割
-スプレッドシートのトリガーイベントを処理し、メインの制御フローを管理する。チェックボックスクリックイベントを検知し、適切な処理を実行する。
+## 1. 役割・概要
+**TriggerManager** は、シングルトンパターンを採用したメイン制御クラスです。スプレッドシートのトリガーイベントを処理し、データインポートのワークフロー全体を統括します。重複実行防止、状態管理、エラーハンドリングの中核を担います。
 
-## 2. 関数
+### 設計方針
+- **Singleton Pattern**: GAS環境での状態一貫性確保
+- **Event-Driven Architecture**: onEdit/onEditInstallable トリガー対応
+- **Defensive Programming**: 重複実行防止・エラー耐性
+- **Type Safety**: TypeScript による厳密な型チェック
 
-### 2.1 onEdit(e)
-**概要:** スプレッドシート編集時のトリガー関数
+## 2. クラス構造
+
+### 2.1 クラス定義
+```typescript
+export class TriggerManager {
+  private static instance: TriggerManager;
+  private notionApiClient: NotionApiClient;
+  private processingStatus: ProcessingStatus;
+
+  private constructor() {
+    this.notionApiClient = new NotionApiClient();
+    this.processingStatus = {
+      isProcessing: false,
+      lastProcessTime: 0,
+      errorHistory: [],
+    };
+  }
+
+  static getInstance(): TriggerManager;
+  
+  // 主要メソッド
+  async onEdit(e: EditEvent): Promise<void>;
+  async processImport(rowNumber: number): Promise<ImportResult>;
+  
+  // インストール可能トリガー管理
+  static setupInstallableTriggers(): void;
+  static clearAllTriggers(): void;
+  static getTriggerStatus(): { count: number; triggers: any[] };
+  
+  // 診断・テスト機能
+  async testConnection(): Promise<{ success: boolean; message: string }>;
+  getProcessingStatus(): ProcessingStatus;
+  clearErrorHistory(): void;
+}
+
+```
+
+## 2. 主要メソッド
+
+### 2.1 onEdit(e: EditEvent): Promise<void>
+**概要:** スプレッドシート編集時のメイントリガー関数
 **引数:** 
-- `e` (Event): 編集イベントオブジェクト
-**戻り値:** なし
-**処理内容:**
-1. 編集位置がチェックボックス列かチェック
-2. チェックボックスがONになった場合のみ処理実行
-3. セキュリティチェック (アクセス権限確認)
-4. 設定情報取得・検証
-5. データインポート処理実行
+- `e` (EditEvent): 編集イベントオブジェクト（型安全）
+**戻り値:** Promise<void>
+**処理フロー:**
+1. 重複実行チェック
+2. チェックボックス列・値の検証
+3. アクセス権限確認
+4. メインインポート処理実行
 
-```javascript
-function onEdit(e) {
+```typescript
+async onEdit(e: EditEvent): Promise<void> {
   try {
-    // セキュリティチェック
-    SecurityManager.validateAccess();
-    
+    Logger.info('Edit event triggered', {
+      row: e.range.getRow(),
+      column: e.range.getColumn(),
+      value: e.value,
+      oldValue: e.oldValue,
+    });
+
+    // 重複実行防止
+    if (this.processingStatus.isProcessing) {
+      Logger.warn('Processing already in progress, skipping');
+      return;
+    }
+
     // チェックボックス列の編集かチェック
-    if (!isCheckboxColumn(e.range)) return;
-    
-    // チェックONの場合のみ処理
-    if (!e.value) return;
-    
+    if (!this.isCheckboxColumn(e.range)) {
+      Logger.debug('Edit is not in checkbox column, skipping');
+      return;
+    }
+
+    // チェックONの場合のみ処理（true, 'TRUE', 1, '1'を許可）
+    if (!this.isCheckboxChecked(e.value)) {
+      Logger.debug('Checkbox is not checked, skipping');
+      return;
+    }
+
+    // セキュリティチェック
+    this.validateAccess(e);
+
     // メイン処理実行
-    processImport(e.range.getRow());
-    
+    await this.processImport(e.range.getRow());
   } catch (error) {
-    ErrorManager.handleError(error, 'onEdit');
+    this.handleError(error, {
+      context: 'onEdit',
+      rowNumber: e.range.getRow(),
+    });
   }
 }
 ```
 
-### 2.2 processImport(rowNumber)
+### 2.2 processImport(rowNumber: number): Promise<ImportResult>
 **概要:** 指定行のデータインポート処理
 **引数:**
 - `rowNumber` (number): 処理対象行番号
-**戻り値:** `Promise<ImportResult>`
-**処理内容:**
-1. 行データ取得
-2. カラムマッピング取得
-3. データ変換・検証
-4. Notion API実行
-5. 結果の記録・通知
+**戻り値:** Promise<ImportResult>
+**処理フロー:**
+1. 処理状態設定・コンテキスト作成
+2. 設定・マッピング情報取得
+3. 行データ取得・変換・検証
+4. Notion API実行（作成/更新）
+5. 主キー記録・成功通知
 
-```javascript
-async function processImport(rowNumber) {
-  const context = { rowNumber, timestamp: new Date() };
-  
+```typescript
+async processImport(rowNumber: number): Promise<ImportResult> {
+  const context: ImportContext = {
+    rowNumber,
+    timestamp: new Date(),
+    userId: this.getCurrentUserId(),
+  };
+
+  this.processingStatus.isProcessing = true;
+  this.processingStatus.lastProcessTime = Date.now();
+
   try {
+    Logger.info('Starting import process', { rowNumber });
+
     // 設定取得
     const config = await ConfigManager.getConfig();
-    const mappings = await ConfigManager.getColumnMappings();
-    
+    const mappings = ConfigManager.getColumnMappings();
+
     // データ取得・変換
-    const rowData = getRowData(rowNumber);
-    const notionData = DataMapper.mapToNotionFormat(rowData, mappings);
+    const rowData = this.getRowData(rowNumber);
+    const validationResult = Validator.validateRowData(rowData, mappings);
     
-    // 検証
-    Validator.validateRowData(rowData, mappings);
-    
-    // API実行
-    const primaryKey = rowData[CONSTANTS.COLUMNS.PRIMARY_KEY];
-    let result;
-    
-    if (primaryKey) {
-      result = await NotionApiClient.updatePage(primaryKey, notionData);
-    } else {
-      result = await NotionApiClient.createPage(config.databaseId, notionData);
-      // 主キーを記録
-      recordPrimaryKey(rowNumber, result.id);
+    if (!validationResult.valid) {
+      throw new SpreadsheetToNotionError(
+        `データ検証エラー: ${validationResult.errors.join(', ')}`,
+        ErrorType.VALIDATION_ERROR
+      );
     }
-    
-    // 成功通知
-    showSuccessMessage('データの連携が完了しました');
+
+    const notionData = DataMapper.mapRowToNotionPage(rowData, mappings);
+
+    // 既存ページ確認・API実行
+    const primaryKeyColumnIndex = this.getPrimaryKeyColumnIndex();
+    const existingPageId = primaryKeyColumnIndex >= 0 ? rowData[primaryKeyColumnIndex] : null;
+
+    let result;
+    if (existingPageId && typeof existingPageId === 'string' && existingPageId.trim()) {
+      // 既存ページの更新
+      result = await this.notionApiClient.updatePage(existingPageId.trim(), notionData);
+    } else {
+      // 新規ページの作成
+      result = await this.notionApiClient.createPage(config.databaseId, notionData);
+      if (primaryKeyColumnIndex >= 0) {
+        this.recordPrimaryKey(rowNumber, result.id);
+      }
+    }
+
+    this.showSuccessMessage('データの連携が完了しました');
+    Logger.info('Import process completed successfully', { rowNumber, pageId: result.id });
+
     return { success: true, result };
-    
   } catch (error) {
-    ErrorManager.handleError(error, context);
-    return { success: false, error };
+    Logger.error('Import process failed', { error, context });
+    this.handleError(error, { context: 'processImport', ...context });
+    return { success: false, error: error as Error };
+  } finally {
+    this.processingStatus.isProcessing = false;
   }
 }
 ```
 
-### 2.3 isCheckboxColumn(range)
-**概要:** 編集された範囲がチェックボックス列かどうかをチェック
-**引数:**
-- `range` (Range): 編集された範囲
-**戻り値:** `boolean`
+### 2.3 インストール可能トリガー管理
 
-```javascript
-function isCheckboxColumn(range) {
+#### setupInstallableTriggers(): void
+**概要:** 外部API権限問題を解決するインストール可能トリガーを設定
+```typescript
+static setupInstallableTriggers(): void {
+  try {
+    // 既存のトリガーをクリア
+    TriggerManager.clearAllTriggers();
+
+    // 編集トリガーを設定
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    ScriptApp.newTrigger('onEditInstallable')
+      .forSpreadsheet(spreadsheet)
+      .onEdit()
+      .create();
+
+    Logger.info('Installable triggers setup completed');
+  } catch (error) {
+    Logger.error('Failed to setup installable triggers', { error });
+  }
+}
+```
+
+#### clearAllTriggers(): void / getTriggerStatus()
+トリガーの管理・診断機能を提供
+
+### 2.4 ユーティリティメソッド
+
+#### isCheckboxColumn(range): boolean
+```typescript
+private isCheckboxColumn(range: GoogleAppsScript.Spreadsheet.Range): boolean {
   return range.getColumn() === CONSTANTS.COLUMNS.CHECKBOX;
 }
 ```
 
-### 2.4 getRowData(rowNumber)
-**概要:** 指定行からデータを取得
-**引数:**
-- `rowNumber` (number): 行番号
-**戻り値:** `Array<any>` (行データ)
-
-```javascript
-function getRowData(rowNumber) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet()
-    .getSheetByName(CONSTANTS.SHEETS.IMPORT_DATA);
-  
-  const lastColumn = sheet.getLastColumn();
-  const range = sheet.getRange(rowNumber, 1, 1, lastColumn);
-  
-  return range.getValues()[0];
-}
-```
-
-### 2.5 recordPrimaryKey(rowNumber, pageId)
-**概要:** 作成されたNotionページIDを主キー列に記録
-**引数:**
-- `rowNumber` (number): 行番号
-- `pageId` (string): NotionページID
-**戻り値:** なし
-
-```javascript
-function recordPrimaryKey(rowNumber, pageId) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet()
-    .getSheetByName(CONSTANTS.SHEETS.IMPORT_DATA);
-  
-  sheet.getRange(rowNumber, CONSTANTS.COLUMNS.PRIMARY_KEY)
-    .setValue(pageId);
-}
-```
-
-### 2.6 showSuccessMessage(message)
-**概要:** 成功メッセージをユーザーに表示
-**引数:**
-- `message` (string): 表示するメッセージ
-**戻り値:** なし
-
-```javascript
-function showSuccessMessage(message) {
-  SpreadsheetApp.getUi().alert('成功', message, SpreadsheetApp.getUi().Buttons.OK);
-}
-```
-
-## 3. データ構造
-
+#### isCheckboxChecked(value): boolean
 ```typescript
+private isCheckboxChecked(value: any): boolean {
+  return value === true || value === 'TRUE' || value === 1 || value === '1';
+}
+```
+
+#### validateAccess(e): void
+```typescript
+private validateAccess(e: EditEvent): void {
+  try {
+    Logger.debug('Access validation passed', { user: e.user.getEmail() });
+  } catch (error) {
+    throw new SpreadsheetToNotionError(
+      'アクセス権限の確認に失敗しました',
+      ErrorType.PERMISSION_ERROR,
+      error as Error
+    );
+  }
+}
+```
+
+## 3. TypeScript型定義
+
+### 3.1 インターフェース
+```typescript
+// EditEvent: Google Apps Script編集イベント
+interface EditEvent {
+  range: GoogleAppsScript.Spreadsheet.Range;
+  value: any;
+  oldValue?: any;
+  source: GoogleAppsScript.Spreadsheet.Spreadsheet;
+  user: GoogleAppsScript.Base.User;
+}
+
+// ImportResult: インポート処理結果
 interface ImportResult {
   success: boolean;
   result?: NotionPageResponse;
   error?: Error;
 }
 
+// ImportContext: インポート処理のコンテキスト
 interface ImportContext {
   rowNumber: number;
   timestamp: Date;
   userId?: string;
 }
 
-interface Event {
-  range: Range;
-  value: any;
-  oldValue?: any;
-  source: Spreadsheet;
-  user: User;
+// ProcessingStatus: 処理ステータス
+interface ProcessingStatus {
+  isProcessing: boolean;
+  lastProcessTime: number;
+  errorHistory: Array<{
+    timestamp: Date;
+    error: string;
+    context?: any;
+  }>;
 }
 ```
 
-## 4. プロパティ/変数
+### 3.2 カスタムエラークラス
+```typescript
+export class SpreadsheetToNotionError extends Error {
+  constructor(
+    message: string,
+    public readonly type: ErrorType,
+    public readonly originalError?: Error
+  ) {
+    super(message);
+    this.name = 'SpreadsheetToNotionError';
+  }
+}
 
-```javascript
-const TRIGGER_MANAGER = {
-  // 処理中フラグ (重複実行防止)
-  isProcessing: false,
+export enum ErrorType {
+  CONFIG_ERROR = 'CONFIG_ERROR',
+  VALIDATION_ERROR = 'VALIDATION_ERROR',
+  API_ERROR = 'API_ERROR',
+  NETWORK_ERROR = 'NETWORK_ERROR',
+  PERMISSION_ERROR = 'PERMISSION_ERROR',
+}
+```
+
+## 4. エラーハンドリング戦略
+
+### 4.1 階層化エラー処理
+```typescript
+private handleError(error: any, context?: any): void {
+  // エラー履歴に記録（最新100件まで）
+  this.processingStatus.errorHistory.push({
+    timestamp: new Date(),
+    error: error instanceof Error ? error.message : String(error),
+    context,
+  });
+
+  if (this.processingStatus.errorHistory.length > 100) {
+    this.processingStatus.errorHistory.shift();
+  }
+
+  // ログ記録（機密情報マスキング）
+  Logger.error('TriggerManager error occurred', { error, context });
+
+  // ユーザー通知メッセージの決定
+  let userMessage = 'データの連携中にエラーが発生しました。';
   
-  // 最後の処理時刻 (レート制限用)
-  lastProcessTime: 0,
+  if (error instanceof SpreadsheetToNotionError) {
+    switch (error.type) {
+      case ErrorType.CONFIG_ERROR:
+        userMessage = '設定に問題があります。管理者にお問い合わせください。';
+        break;
+      case ErrorType.VALIDATION_ERROR:
+        userMessage = `データに問題があります: ${error.message}`;
+        break;
+      case ErrorType.API_ERROR:
+        userMessage = 'Notion APIとの通信でエラーが発生しました。しばらく待ってから再試行してください。';
+        break;
+      case ErrorType.PERMISSION_ERROR:
+        userMessage = 'アクセス権限がありません。管理者にお問い合わせください。';
+        break;
+    }
+  }
+
+  this.showErrorMessage(userMessage);
+}
+```
+
+### 4.2 処理可能なエラータイプ
+| エラータイプ | 原因 | 対処方針 |
+|-------------|------|---------|
+| CONFIG_ERROR | 設定不備・認証失敗 | 設定確認を促すメッセージ |
+| VALIDATION_ERROR | データ形式不正 | 具体的な問題箇所を通知 |
+| API_ERROR | Notion API通信失敗 | リトライ可能性を判定 |
+| NETWORK_ERROR | ネットワーク接続問題 | 一時的な問題として案内 |
+| PERMISSION_ERROR | アクセス権限不足 | 管理者連絡を促す |
+
+## 5. 実装の特徴
+
+### 5.1 シングルトンパターン
+```typescript
+export class TriggerManager {
+  private static instance: TriggerManager;
   
-  // エラー履歴 (デバッグ用)
-  errorHistory: []
+  private constructor() { /* private constructor */ }
+  
+  static getInstance(): TriggerManager {
+    if (!TriggerManager.instance) {
+      TriggerManager.instance = new TriggerManager();
+    }
+    return TriggerManager.instance;
+  }
+}
+```
+
+**利点:**
+- GAS環境での状態一貫性保証
+- 重複実行防止
+- エラー履歴の永続化
+
+### 5.2 インストール可能トリガー対応
+**課題:** 単純なonEditトリガーでは外部API権限が制限される
+**解決:** インストール可能トリガー（onEditInstallable）による権限問題解決
+
+```typescript
+// グローバル関数（GAS用）
+globalThis.onEditInstallable = function (e: any): void {
+  const triggerManager = TriggerManager.getInstance();
+  triggerManager.onEdit(e as EditEvent).catch(error => {
+    Logger.error('Unhandled error in onEditInstallable trigger', { error });
+  });
 };
 ```
 
-## 5. エラーハンドリング
-
-### 5.1 処理可能なエラー
-- 設定エラー（CONFIG_ERROR）
-- データ検証エラー（VALIDATION_ERROR）
-- API接続エラー（API_ERROR）
-- 権限エラー（PERMISSION_ERROR）
-
-### 5.2 エラー処理方針
-- すべてのエラーはErrorManager.handleError()に委譲
-- ユーザーにはわかりやすいメッセージで通知
-- 詳細なエラー情報はログに記録
+### 5.3 診断・デバッグ支援
+- **接続テスト**: `testConnection()` - Notion API接続確認
+- **状態取得**: `getProcessingStatus()` - 現在の処理状況確認
+- **エラーリセット**: `clearErrorHistory()` - エラー履歴クリア
+- **トリガー管理**: `setupTriggers()`, `clearTriggers()`, `showTriggerStatus()`
 
 ## 6. 依存関係
 
-### 6.1 依存モジュール
-- ConfigManager: 設定情報の取得
-- DataMapper: データ変換処理
-- Validator: データ検証
-- NotionApiClient: Notion API通信
-- ErrorManager: エラーハンドリング
-- SecurityManager: セキュリティチェック
+### 6.1 コアモジュール依存
+```typescript
+import { ConfigManager } from './ConfigManager';      // 設定・認証管理
+import { Validator } from './Validator';              // データ検証
+import { DataMapper } from './DataMapper';            // データ変換
+import { NotionApiClient } from './NotionApiClient';  // API通信
+```
 
-### 6.2 外部依存
-- Google Apps Script API
-- SpreadsheetApp サービス
-- PropertiesService
+### 6.2 ユーティリティ依存
+```typescript
+import { CONSTANTS } from '../utils/Constants';      // 定数・設定値
+import { Logger } from '../utils/Logger';            // ログ・診断
+```
+
+### 6.3 型定義依存
+```typescript
+import {
+  EditEvent, ImportContext, ImportResult, ProcessingStatus,
+  ErrorType, SpreadsheetToNotionError
+} from '../types';
+```
+
+### 6.4 外部API依存
+- **SpreadsheetApp**: スプレッドシート操作
+- **ScriptApp**: トリガー管理
+- **Session**: ユーザー情報取得
