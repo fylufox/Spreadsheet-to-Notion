@@ -449,21 +449,8 @@ export class TriggerManager {
         .create();
 
       Logger.info('Installable triggers setup completed');
-
-      // 成功メッセージを表示
-      SpreadsheetApp.getUi().alert(
-        '設定完了',
-        'インストール可能なトリガーが正常に設定されました。\n' +
-          'これで外部APIへのアクセス権限が有効になります。',
-        SpreadsheetApp.getUi().ButtonSet.OK
-      );
     } catch (error) {
       Logger.error('Failed to setup installable triggers', { error });
-      SpreadsheetApp.getUi().alert(
-        'エラー',
-        'トリガーの設定に失敗しました: ' + (error as Error).message,
-        SpreadsheetApp.getUi().ButtonSet.OK
-      );
     }
   }
 
@@ -624,32 +611,11 @@ globalThis.onEditInstallable = function (e: any): void {
  */
 (globalThis as any).clearTriggers = () => {
   TriggerManager.clearAllTriggers();
-  SpreadsheetApp.getUi().alert('すべてのトリガーをクリアしました');
 };
 
 /**
  * 現在のトリガー状況を表示（管理者用）
  */
 (globalThis as any).showTriggerStatus = () => {
-  const status = TriggerManager.getTriggerStatus();
-
-  let message = `現在のトリガー数: ${status.count}\n\n`;
-
-  if (status.triggers.length > 0) {
-    message += 'トリガー詳細:\n';
-    status.triggers.forEach((trigger, index) => {
-      message += `${index + 1}. 関数: ${trigger.handlerFunction}\n`;
-      message += `   イベント: ${trigger.eventType}\n`;
-      message += `   ソース: ${trigger.triggerSource}\n\n`;
-    });
-  } else {
-    message += 'トリガーが設定されていません。\n';
-    message += '「setupTriggers」関数を実行してトリガーを設定してください。';
-  }
-
-  SpreadsheetApp.getUi().alert(
-    'トリガー状況',
-    message,
-    SpreadsheetApp.getUi().ButtonSet.OK
-  );
+  TriggerManager.getTriggerStatus();
 };
