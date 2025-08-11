@@ -103,18 +103,18 @@ Googleスプレッドシートで管理・加工したデータを、Notionデ�
 - **レート制限**: 3リクエスト/秒対応
 
 ### 対応データ型
-| Notionプロパティ | スプレッドシート | 備考 |
-|-----------------|------------------|------|
-| Title           | 文字列           | 必須プロパティ |
-| Rich Text       | 文字列           | マークダウン対応 |
-| Number          | 数値             | 整数・小数対応 |
-| Select          | 文字列           | 選択肢と一致必要 |
-| Multi-select    | 文字列           | カンマ区切り |
-| Date            | 日付             | ISO8601形式 |
-| Checkbox        | Boolean          | TRUE/FALSE |
-| URL             | URL文字列        | 形式検証あり |
-| Email           | メール文字列      | 形式検証あり |
-| Phone           | 電話番号文字列    | 形式検証あり |
+| Notionプロパティ | スプレッドシート | dataType文字列 | 備考 |
+|-----------------|------------------|----------------|------|
+| Title           | 文字列           | title          | 必須プロパティ |
+| Rich Text       | 文字列           | rich_text      | マークダウン対応 |
+| Number          | 数値             | number         | 整数・小数対応 |
+| Select          | 文字列           | select         | 選択肢と一致必要 |
+| Multi-select    | 文字列           | multi_select   | カンマ区切り |
+| Date            | 日付             | date           | ISO8601形式 |
+| Checkbox        | Boolean          | checkbox       | TRUE/FALSE |
+| URL             | URL文字列        | url            | 形式検証あり |
+| Email           | メール文字列      | email          | 形式検証あり |
+| Phone           | 電話番号文字列    | phone_number   | 形式検証あり |
 
 ## セットアップ
 
