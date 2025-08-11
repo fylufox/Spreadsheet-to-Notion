@@ -21,56 +21,6 @@ import { TriggerManager } from './core/TriggerManager';
 import { ConfigManager } from './core/ConfigManager';
 
 /**
- * システム初期化関数（手動実行用）
- */
-function initializeSystem(): void {
-  try {
-    Logger.info('System initialization started');
-
-    // システム情報をログ出力
-    Logger.info('System constants loaded', {
-      version: CONSTANTS.DEFAULTS.VERSION,
-      sheets: CONSTANTS.SHEETS,
-    });
-
-    Logger.info('System initialization completed');
-  } catch (error) {
-    Logger.error('System initialization failed', error);
-  }
-}
-
-/**
- * 開発・デバッグ用の動作確認関数
- */
-function testBasicFunctions(): void {
-  try {
-    Logger.info('Running basic function tests');
-
-    // Constants の動作確認
-    Logger.debug('Testing constants', {
-      sheetsCount: Object.keys(CONSTANTS.SHEETS).length,
-      dataTypesCount: Object.keys(CONSTANTS.DATA_TYPES).length,
-    });
-
-    // Logger の各レベルをテスト
-    Logger.debug('Debug test message');
-    Logger.info('Info test message');
-    Logger.warn('Warning test message');
-    Logger.error('Error test message');
-
-    // 機密情報マスキングのテスト
-    Logger.info('Testing sensitive data masking', {
-      apiToken: 'secret_abcdefghijklmnopqrstuvwxyz1234567890123',
-      normalData: 'This is normal data',
-    });
-
-    Logger.info('Basic function tests completed');
-  } catch (error) {
-    Logger.error('Basic function tests failed', error);
-  }
-}
-
-/**
  * TriggerManagerの動作をテストする関数（デバッグ用）
  */
 function testTriggerManager(): void {
@@ -84,7 +34,8 @@ function testTriggerManager(): void {
     Logger.info('Current processing status', status);
 
     // 接続テストを実行
-    triggerManager.testConnection()
+    triggerManager
+      .testConnection()
       .then(result => {
         Logger.info('Connection test results', result);
       })
@@ -269,43 +220,6 @@ function runDiagnostics(): void {
 }
 
 /**
- * Notion APIトークンを設定する関数（手動実行用）
- * @param token Notion APIトークン（secret_またはntn_で始まる文字列）
- */
-function setNotionApiToken(token?: string): void {
-  try {
-    if (!token) {
-      Logger.error('APIトークンが指定されていません');
-      Logger.info(
-        '使用方法: setNotionApiToken("ntn_your_token_here") または setNotionApiToken("secret_your_token_here")'
-      );
-      return;
-    }
-
-    const success = ConfigManager.setApiToken(token);
-    if (success) {
-      Logger.info('Notion APIトークンが正常に設定されました');
-
-      // 設定後の確認
-      try {
-        const retrievedToken = ConfigManager.getApiToken();
-        Logger.info('設定確認完了', {
-          tokenSet: true,
-          tokenLength: retrievedToken.length,
-          startsCorrectly: retrievedToken.startsWith('secret_'),
-        });
-      } catch (error) {
-        Logger.error('設定後の確認に失敗しました', error);
-      }
-    } else {
-      Logger.error('Notion APIトークンの設定に失敗しました');
-    }
-  } catch (error) {
-    Logger.error('setNotionApiToken実行中にエラーが発生しました', error);
-  }
-}
-
-/**
  * プロパティサービスの詳細な診断を行う関数
  */
 function diagnoseProperties(): void {
@@ -456,9 +370,6 @@ function showTriggerStatus(): void {
 (globalThis as any).testConfiguration = testConfiguration;
 (globalThis as any).testTriggerManager = testTriggerManager;
 (globalThis as any).testOnEditManually = testOnEditManually;
-(globalThis as any).initializeSystem = initializeSystem;
-(globalThis as any).testBasicFunctions = testBasicFunctions;
-(globalThis as any).setNotionApiToken = setNotionApiToken;
 (globalThis as any).diagnoseProperties = diagnoseProperties;
 (globalThis as any).diagnoseColumnMappingSheet = diagnoseColumnMappingSheet;
 

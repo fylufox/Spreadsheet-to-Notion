@@ -297,9 +297,10 @@ GAS エディタで以下のデバッグ関数が利用可能:
 
 ```javascript
 // システム診断
-runDiagnostics()          // 全体的な診断
-testConfiguration()       // 設定確認
-diagnoseProperties()      // プロパティ診断
+runDiagnostics()             // 全体的な診断
+testConfiguration()          // 設定確認
+diagnoseProperties()         // プロパティ診断
+diagnoseColumnMappingSheet() // カラムマッピング診断
 
 // トリガー管理
 setupTriggers()          // トリガー設定
